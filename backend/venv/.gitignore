@@ -5,3 +5,11 @@ __pycache__/
 media/
 *.sqlite3
 .qodo/
+backend/venv/
+backend/.env
+backend/media/
+backend/__pycache__/
+backend/*.pyc
+frontend/node_modules/
+frontend/dist/
+frontend/.env
