@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../frontend"
+		},
+		{
+			"name": "nuc-accreditation",
+			"path": "."
+		}
+	],
+	"settings": {}
+}

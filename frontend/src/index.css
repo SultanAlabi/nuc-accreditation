@@ -1,0 +1,113 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS
+   Single source of truth for all colors, spacing, typography, and shadows.
+   Import this first in global.css — never hardcode values elsewhere.
+───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Brand / Primary */
+  --color-navy-950:   #07162F;
+  --color-navy-900:   #0C2D5E;
+  --color-navy-800:   #0F3A7A;
+  --color-accent:     #22D3EE;
+  --color-accent-dim: rgba(34, 211, 238, 0.12);
+
+  /* Status */
+  --color-success:        #059669;
+  --color-success-light:  #D1FAE5;
+  --color-success-border: #6EE7B7;
+
+  --color-warning:        #D97706;
+  --color-warning-light:  #FEF3C7;
+  --color-warning-border: #FCD34D;
+
+  --color-danger:         #DC2626;
+  --color-danger-light:   #FEE2E2;
+  --color-danger-border:  #FCA5A5;
+
+  --color-info:           #2563EB;
+  --color-info-light:     #DBEAFE;
+  --color-info-border:    #BFDBFE;
+
+  --color-purple:         #7C3AED;
+  --color-purple-light:   #EDE9FE;
+
+  /* Neutral / UI */
+  --color-white:      #FFFFFF;
+  --color-bg:         #F0F4F8;
+  --color-surface:    #FFFFFF;
+  --color-surface-2:  #F8FAFC;
+  --color-border:     #E2E8F0;
+  --color-border-2:   #CBD5E1;
+
+  --color-text-primary:   #07162F;
+  --color-text-secondary: #374151;
+  --color-text-muted:     #64748B;
+  --color-text-faint:     #94A3B8;
+
+  /* Typography */
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Courier New", monospace;
+
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  --leading-tight:  1.25;
+  --leading-normal: 1.5;
+
+  --tracking-wide:    0.06em;
+  --tracking-widest:  0.12em;
+
+  /* Spacing (4px base grid) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Layout */
+  --sidebar-width:   230px;
+  --topbar-height:   56px;
+  --content-padding: 36px;
+  --content-max-w:   1280px;
+
+  /* Border radius */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 4px rgba(7, 22, 47, 0.06);
+  --shadow-md: 0 4px 16px rgba(7, 22, 47, 0.10);
+  --shadow-lg: 0 8px 32px rgba(7, 22, 47, 0.14);
+  --shadow-xl: 0 25px 80px rgba(7, 22, 47, 0.25);
+
+  /* Transitions */
+  --transition-fast: 0.12s ease;
+  --transition-base: 0.20s ease;
+  --transition-slow: 0.35s ease;
+
+  /* Z-index scale */
+  --z-dropdown: 100;
+  --z-sidebar:  200;
+  --z-modal:    500;
+  --z-toast:    900;
+}
