@@ -11,10 +11,13 @@ class User(AbstractUser):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     role = models.CharField(max_length=20, choices=Role.choices)
+    phone = models.CharField(max_length=20, blank=True)
     staff_id = models.CharField(max_length=50, blank=True)
     university = models.CharField(max_length=200, blank=True)
     department = models.CharField(max_length=100, blank=True)
     faculty = models.CharField(max_length=100, blank=True)
+    email_notifications = models.BooleanField(default=True)
+    sms_notifications = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name', 'role']

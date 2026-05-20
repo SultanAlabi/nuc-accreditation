@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'programmes',
     'documents',
     'notifications',
+    'dashboard',
+    'team',
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

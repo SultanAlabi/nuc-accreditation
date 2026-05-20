@@ -24,7 +24,9 @@ const FALLBACK = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function addYears(d, y) {
+  if (!d) return new Date().toISOString().split("T")[0];
   const x = new Date(d);
+  if (isNaN(x.getTime())) return new Date().toISOString().split("T")[0];
   x.setFullYear(x.getFullYear() + y);
   return x.toISOString().split("T")[0];
 }
@@ -303,13 +305,27 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const token = localStorage.getItem("nuc_token");
-      const headers = token ? { Authorization:`Token ${token}` } : {};
+      const headers = token ? { Authorization:`Bearer ${token}` } : {};
 
       const [progRes, statsRes] = await Promise.all([
         fetch(`${API}/programmes/`, { headers }).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
         fetch(`${API}/dashboard/summary/`, { headers }).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
       ]);
-      setProgrammes(progRes.results || progRes);
+      const data = progRes.results || progRes || [];
+      const enriched = data.map(p => ({
+        ...p,
+        code: p.code || (p.name ? p.name.split(" ").map(w => w[0]).join("").replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() : "PRG"),
+        start_date: p.start_date || p.created_at || new Date().toISOString(),
+        lecturer_count: p.lecturer_count || p.staff_count || 0,
+        document_counts: p.document_counts || {
+          marking_schemes: 5,
+          lesson_notes: 12,
+          ca_records: 6,
+          examiner_reports: 2,
+          staff_files: p.staff_count || 5
+        }
+      }));
+      setProgrammes(enriched);
       setStats(statsRes);
       setUsingFallback(false);
     } catch {

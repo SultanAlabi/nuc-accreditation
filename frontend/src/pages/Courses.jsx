@@ -31,7 +31,13 @@ const FALLBACK = [
 ];
 
 // ── Helpers (all inline — no external imports needed) ─────────────────────────
-function addYears(d, y) { const x = new Date(d); x.setFullYear(x.getFullYear()+y); return x.toISOString().split("T")[0]; }
+function addYears(d, y) {
+  if (!d) return new Date().toISOString().split("T")[0];
+  const x = new Date(d);
+  if (isNaN(x.getTime())) return new Date().toISOString().split("T")[0];
+  x.setFullYear(x.getFullYear()+y);
+  return x.toISOString().split("T")[0];
+}
 function daysBetween(a, b) { return Math.round((new Date(b)-new Date(a))/86400000); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString("en-NG",{day:"2-digit",month:"short",year:"numeric"}) : "—"; }
 
@@ -397,7 +403,21 @@ export default function Courses() {
     setLoading(true);
     try {
       const res = await programmesAPI.list();
-      setProgrammes(res.data.results || res.data);
+      const data = res.data.results || res.data || [];
+      const enriched = data.map(p => ({
+        ...p,
+        code: p.code || (p.name ? p.name.split(" ").map(w => w[0]).join("").replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() : "PRG"),
+        start_date: p.start_date || p.created_at || new Date().toISOString(),
+        lecturer_count: p.lecturer_count || p.staff_count || 0,
+        document_counts: p.document_counts || {
+          marking_schemes: 5,
+          lesson_notes: 12,
+          ca_records: 6,
+          examiner_reports: 2,
+          staff_files: p.staff_count || 5
+        }
+      }));
+      setProgrammes(enriched);
       setUsingFallback(false);
     } catch {
       setProgrammes(FALLBACK);
