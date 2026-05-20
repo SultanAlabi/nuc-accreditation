@@ -1,5 +1,5 @@
 // src/hooks/useRole.js
-// Central role logic — import this everywhere instead of checking strings manually.
+
 
 import { useAuth } from "../context/AuthContext";
 
