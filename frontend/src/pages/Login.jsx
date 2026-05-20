@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { authAPI } from "../services/api";
 
 export default function Login() {
   const navigate  = useNavigate();
@@ -12,6 +13,77 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
+
+  // Forgot password state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [forgotStep, setForgotStep] = useState(1); // 1 = Request Code, 2 = Verify & Reset
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [forgotDebugCode, setForgotDebugCode] = useState("");
+
+  const handleRequestCode = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      setForgotError("Please enter your email address.");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError("");
+    setForgotSuccess("");
+    setForgotDebugCode("");
+    try {
+      const res = await authAPI.forgotPassword({ email: forgotEmail.trim() });
+      setForgotSuccess(res.data.message || "Verification code sent!");
+      if (res.data.debug_code) {
+        setForgotDebugCode(res.data.debug_code);
+      }
+      setForgotStep(2);
+    } catch (err) {
+      setForgotError(err.response?.data?.error || "Failed to send reset code. Please verify your email.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!verificationCode.trim()) {
+      setForgotError("Please enter the 6-digit verification code.");
+      return;
+    }
+    if (!newPassword) {
+      setForgotError("Please enter your new password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setForgotError("Password must be at least 8 characters long.");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError("");
+    try {
+      const res = await authAPI.resetPassword({
+        email: forgotEmail.trim(),
+        code: verificationCode.trim(),
+        new_password: newPassword,
+      });
+      setForgotSuccess(res.data.message || "Password reset successfully!");
+      setForgotStep(3);
+      
+      setTimeout(() => {
+        setShowForgotModal(false);
+        setEmail(forgotEmail.trim());
+      }, 2000);
+    } catch (err) {
+      setForgotError(err.response?.data?.error || "Invalid or expired code. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -149,6 +221,37 @@ export default function Login() {
           font-weight: 500; margin-bottom: 22px;
           animation: fadeIn 0.2s ease;
         }
+        .modal-overlay {
+          position: fixed; inset: 0; background: rgba(7, 22, 47, 0.75);
+          backdrop-filter: blur(8px); display: flex; align-items: center;
+          justify-content: center; z-index: 1000; animation: fadeIn 0.2s ease-out;
+        }
+        .modal-card {
+          background: #fff; width: 100%; max-width: 440px;
+          border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+          border: 1px solid #E2E8F0; padding: 32px; animation: fadeIn 0.25s ease-out;
+          position: relative;
+        }
+        .modal-close {
+          position: absolute; right: 20px; top: 20px;
+          background: none; border: none; font-size: 20px; cursor: pointer;
+          color: #94A3B8; transition: color 0.15s;
+        }
+        .modal-close:hover { color: #64748B; }
+        .success-box {
+          display: flex; align-items: center; gap: 10px;
+          background: #ECFDF5; border: 1px solid #A7F3D0;
+          color: #059669; border-radius: 8px;
+          padding: 12px 16px; font-size: 13px;
+          font-weight: 500; margin-bottom: 22px;
+          animation: fadeIn 0.2s ease;
+        }
+        .debug-box {
+          background: #EFF6FF; border: 1px dashed #3B82F6;
+          color: #1D4ED8; border-radius: 8px; padding: 12px;
+          font-size: 12px; margin-bottom: 20px; font-family: monospace;
+          line-height: 1.5;
+        }
       `}</style>
 
       {/* ── Left panel ── */}
@@ -273,6 +376,16 @@ export default function Login() {
                 alignItems:"center", marginBottom:8 }}>
                 <label className="l-label" style={{ marginBottom:0 }}>Password</label>
                 <button type="button"
+                  onClick={() => {
+                    setForgotEmail("");
+                    setVerificationCode("");
+                    setNewPassword("");
+                    setForgotStep(1);
+                    setForgotError("");
+                    setForgotSuccess("");
+                    setForgotDebugCode("");
+                    setShowForgotModal(true);
+                  }}
                   style={{ background:"none", border:"none", cursor:"pointer",
                     fontSize:12, color:"#2563EB", fontWeight:600,
                     padding:0, fontFamily:"inherit" }}>
@@ -343,6 +456,116 @@ export default function Login() {
           </p>
         </div>
       </div>
+
+      {/* ── Forgot Password Modal Overlay ── */}
+      {showForgotModal && (
+        <div className="modal-overlay" onClick={() => setShowForgotModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setShowForgotModal(false)} aria-label="Close modal">
+              ×
+            </button>
+
+            <h3 style={{ fontSize:20, fontWeight:700, color:"#07162F", margin:"0 0 8px" }}>
+              Account Recovery
+            </h3>
+            <p style={{ fontSize:13, color:"#64748B", margin:"0 0 24px", lineHeight:1.5 }}>
+              {forgotStep === 1 && "Enter the email associated with your account to receive a 6-digit recovery verification code."}
+              {forgotStep === 2 && "Enter the 6-digit verification code and choose your new account password."}
+              {forgotStep === 3 && "Recovery complete!"}
+            </p>
+
+            {forgotError && (
+              <div className="error-box" style={{ marginBottom: 16 }}>
+                <span>⚠</span>
+                <span>{forgotError}</span>
+              </div>
+            )}
+
+            {forgotSuccess && (
+              <div className="success-box" style={{ marginBottom: 16 }}>
+                <span>✓</span>
+                <span>{forgotSuccess}</span>
+              </div>
+            )}
+
+            {forgotDebugCode && (
+              <div className="debug-box">
+                <strong>🔑 Development Mode Helper:</strong><br />
+                The system generated code: <strong>{forgotDebugCode}</strong>. Use this code to complete verification without checking console logs.
+              </div>
+            )}
+
+            {forgotStep === 1 && (
+              <form onSubmit={handleRequestCode}>
+                <div style={{ marginBottom: 20 }}>
+                  <label className="l-label">Email Address</label>
+                  <input
+                    className="l-input"
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={e => { setForgotEmail(e.target.value); setForgotError(""); }}
+                    placeholder="you@university.edu.ng"
+                    autoFocus
+                  />
+                </div>
+                <button type="submit" disabled={forgotLoading} className="l-btn-primary">
+                  {forgotLoading && <span className="spinner" />}
+                  {forgotLoading ? "Requesting..." : "Send Verification Code →"}
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 2 && (
+              <form onSubmit={handleResetPassword}>
+                <div style={{ marginBottom: 16 }}>
+                  <label className="l-label">6-Digit Verification Code</label>
+                  <input
+                    className="l-input"
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={e => { setVerificationCode(e.target.value); setForgotError(""); }}
+                    placeholder="123456"
+                    style={{ letterSpacing: "0.2em", textAlign: "center", fontSize: "16px", fontWeight: "bold" }}
+                    autoFocus
+                  />
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label className="l-label">New Password</label>
+                  <input
+                    className="l-input"
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={e => { setNewPassword(e.target.value); setForgotError(""); }}
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <button type="submit" disabled={forgotLoading} className="l-btn-primary">
+                  {forgotLoading && <span className="spinner" />}
+                  {forgotLoading ? "Resetting..." : "Reset Password & Log In →"}
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 3 && (
+              <div style={{ textAlign: "center", padding: "12px 0" }}>
+                <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎉</div>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "#059669" }}>
+                  Your password has been updated!
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748B", marginTop: "4px" }}>
+                  Returning to the login screen...
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

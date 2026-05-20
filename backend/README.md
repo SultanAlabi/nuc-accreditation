@@ -117,6 +117,8 @@ All protected endpoints require a `Bearer <token>` inside the `Authorization` he
 | GET | `/api/auth/me/` | Yes | Get currently logged-in user profile |
 | PATCH | `/api/auth/profile/` | Yes | Update user profile fields |
 | POST | `/api/auth/change-password/` | Yes | Secure password change view |
+| POST | `/api/auth/forgot-password/` | No | Request password recovery 6-digit verification code |
+| POST | `/api/auth/reset-password/` | No | Verify recovery code and set new password |
 | PATCH | `/api/auth/preferences/` | Yes | Update SMS & Email notification preferences |
 | DELETE | `/api/auth/account/` | Yes | Deactivate currently logged-in user account |
 | POST | `/api/auth/token/refresh/` | No | Refresh JWT access token |

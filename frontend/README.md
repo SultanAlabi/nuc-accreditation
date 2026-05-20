@@ -13,6 +13,7 @@ A premium, interactive, and responsive web application dashboard designed for Ni
 - **Team Management Portal**: Invite reviewers, observer panel members, and manage roles dynamically with live access revoking.
 - **Unified Notification Panel**: Dismissible real-time notification alerts for HOD submissions, verification approvals, or upcoming milestone deadlines.
 - **Profile & Settings System**: Update user profiles, configure SMS & Email notification channels, change passwords, and deactivate accounts cleanly.
+- **Password Recovery Flow**: A visually stunning, multi-step recovery wizard modal directly on the login page, featuring a secure 6-digit verification code system and automated in-browser debug assistant.
 
 ---
 
