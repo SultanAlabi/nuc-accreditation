@@ -1,111 +1,113 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS
+   Single source of truth for all colors, spacing, typography, and shadows.
+   Import this first in global.css — never hardcode values elsewhere.
+───────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Brand / Primary */
+  --color-navy-950:   #07162F;
+  --color-navy-900:   #0C2D5E;
+  --color-navy-800:   #0F3A7A;
+  --color-accent:     #22D3EE;
+  --color-accent-dim: rgba(34, 211, 238, 0.12);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Status */
+  --color-success:        #059669;
+  --color-success-light:  #D1FAE5;
+  --color-success-border: #6EE7B7;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --color-warning:        #D97706;
+  --color-warning-light:  #FEF3C7;
+  --color-warning-border: #FCD34D;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
+  --color-danger:         #DC2626;
+  --color-danger-light:   #FEE2E2;
+  --color-danger-border:  #FCA5A5;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+  --color-info:           #2563EB;
+  --color-info-light:     #DBEAFE;
+  --color-info-border:    #BFDBFE;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+  --color-purple:         #7C3AED;
+  --color-purple-light:   #EDE9FE;
 
-body {
-  margin: 0;
-}
+  /* Neutral / UI */
+  --color-white:      #FFFFFF;
+  --color-bg:         #F0F4F8;
+  --color-surface:    #FFFFFF;
+  --color-surface-2:  #F8FAFC;
+  --color-border:     #E2E8F0;
+  --color-border-2:   #CBD5E1;
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
+  --color-text-primary:   #07162F;
+  --color-text-secondary: #374151;
+  --color-text-muted:     #64748B;
+  --color-text-faint:     #94A3B8;
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
+  /* Typography */
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Courier New", monospace;
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  --leading-tight:  1.25;
+  --leading-normal: 1.5;
+
+  --tracking-wide:    0.06em;
+  --tracking-widest:  0.12em;
+
+  /* Spacing (4px base grid) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Layout */
+  --sidebar-width:   230px;
+  --topbar-height:   56px;
+  --content-padding: 36px;
+  --content-max-w:   1280px;
+
+  /* Border radius */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 4px rgba(7, 22, 47, 0.06);
+  --shadow-md: 0 4px 16px rgba(7, 22, 47, 0.10);
+  --shadow-lg: 0 8px 32px rgba(7, 22, 47, 0.14);
+  --shadow-xl: 0 25px 80px rgba(7, 22, 47, 0.25);
+
+  /* Transitions */
+  --transition-fast: 0.12s ease;
+  --transition-base: 0.20s ease;
+  --transition-slow: 0.35s ease;
+
+  /* Z-index scale */
+  --z-dropdown: 100;
+  --z-sidebar:  200;
+  --z-modal:    500;
+  --z-toast:    900;
 }
