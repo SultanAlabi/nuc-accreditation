@@ -12,10 +12,10 @@ import {
 const FALLBACK = {
   C001: { id:"C001", faculty:"Engineering", department:"Computer Science",
     name:"B.Eng. Computer Engineering", code:"CPE",
-    start_date:"2022-09-01", status:"RESOURCE", student_count:187, lecturer_count:14,
+    start_date:"2022-09-01", status:"IN_REVIEW", student_count:187, lecturer_count:14,
     full_time_lecturers:10, phd_holders:7, lab_area_m2:320, book_titles:420,
     has_internet:true, has_student_lab:true, description:"A rigorous programme focusing on hardware and software systems design.",
-    document_counts:{ marking_schemes:12, lesson_notes:45, ca_records:8, examiner_reports:3, staff_files:14 },
+    document_counts:{},
     documents:[
       { id:"D001", category:"marking_schemes",  name:"CPE301 Marking Scheme 2024.pdf", uploaded_at:"2024-02-10", verified:true,  size:"240 KB" },
       { id:"D002", category:"lesson_notes",     name:"Data Structures Lecture Notes.pdf", uploaded_at:"2024-01-22", verified:true,  size:"1.2 MB" },
@@ -37,7 +37,7 @@ const DOC_CATEGORIES = [
   { key: "research_evidence",label: "Research Evidence", icon: "🔬", required: 1  },
 ];
 
-const STATUS_FLOW = ["PENDING","APPROVED","RESOURCE","ACCREDITED","REACCREDIT"];
+const STATUS_FLOW = ["PENDING","IN_REVIEW","FORWARDED_TO_NUC","ACCREDITED","DENIED"];
 
 // ── Sub components ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -223,7 +223,7 @@ function UploadModal({ programmeId, onClose, onSuccess }) {
 export default function CourseDetail() {
   const { id }        = useParams();
   const navigate      = useNavigate();
-  const { isNUCVisitor, can } = useRole();
+  const { isNUCVisitor, isAPU, can } = useRole();
   const location      = useLocation();
 
   const [programme, setProgramme] = useState(null);
@@ -277,13 +277,7 @@ export default function CourseDetail() {
         code: p.code || (p.name ? p.name.split(" ").map(w => w[0]).join("").replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() : "PRG"),
         start_date: p.start_date || p.created_at || new Date().toISOString(),
         lecturer_count: p.lecturer_count || p.staff_count || 0,
-        document_counts: p.document_counts || {
-          marking_schemes: 5,
-          lesson_notes: 12,
-          ca_records: 6,
-          examiner_reports: 2,
-          staff_files: p.staff_count || 5
-        }
+        document_counts: p.document_counts || {},
       } : null;
       setProgramme(enriched);
       setDocuments(docRes.data.results || docRes.data);
@@ -413,9 +407,11 @@ export default function CourseDetail() {
                 {downloading ? "📥 Downloading..." : "📥 Download PDF Report"}
               </button>
               
-              <button onClick={() => setShowUpload(true)} style={ds.btnPri}>
-                📤 Upload Documents
-              </button>
+              {can.uploadDocument && (
+                <button onClick={() => setShowUpload(true)} style={ds.btnPri}>
+                  📤 Upload Documents
+                </button>
+              )}
               <button onClick={() => navigate(`/courses`)} style={ds.btnGhost}>
                 ← All Courses
               </button>

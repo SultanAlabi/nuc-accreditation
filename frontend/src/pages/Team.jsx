@@ -7,7 +7,7 @@ const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const TEAM_ROLES = {
-  PROFESSOR: {
+  LEAD: {
     label:  "Lead Professor",
     sub:    "NUC Accreditation Panel Lead",
     icon:   "🎓",
@@ -16,7 +16,7 @@ const TEAM_ROLES = {
     border: "#C4B5FD",
     access: "Full read access — all documents, reports, and programme data",
   },
-  NUC_STAFF: {
+  MEMBER: {
     label:  "NUC Staff Officer",
     sub:    "National Universities Commission",
     icon:   "🏛",
@@ -25,7 +25,7 @@ const TEAM_ROLES = {
     border: "#BFDBFE",
     access: "Full read access — can submit accreditation reports",
   },
-  OBSERVER: {
+  REVIEWER: {
     label:  "Third Member / Observer",
     sub:    "Independent Assessor",
     icon:   "🔍",
@@ -48,7 +48,7 @@ const DEMO_MEMBERS = [
     id: "TM-001",
     name: "Prof. Emmanuel Adebayo",
     email: "e.adebayo@nuc.edu.ng",
-    role: "PROFESSOR",
+    role: "LEAD",
     status: "ACTIVE",
     institution: "University of Ibadan",
     phone: "+234 803 000 0001",
@@ -62,7 +62,7 @@ const DEMO_MEMBERS = [
     id: "TM-002",
     name: "Dr. Ngozi Okafor",
     email: "n.okafor@nuc.gov.ng",
-    role: "NUC_STAFF",
+    role: "MEMBER",
     status: "ACTIVE",
     institution: "National Universities Commission",
     phone: "+234 803 000 0002",
@@ -352,12 +352,19 @@ function InviteModal({ programmes, onClose, onSuccess, toast }) {
 // ── Member Card ────────────────────────────────────────────────────────────────
 function MemberCard({ member, programmes, onRevoke, onReactivate, onRemove }) {
   const [expanded, setExpanded] = useState(false);
-  const roleCfg   = TEAM_ROLES[member.role]   || TEAM_ROLES.OBSERVER;
-  const statusCfg = ACCESS_STATUS[member.status] || ACCESS_STATUS.PENDING;
+  const roleCfg   = TEAM_ROLES[member.role]   || TEAM_ROLES.REVIEWER;
+  const displayStatus = member.status || (member.user?.is_active !== false ? "ACTIVE" : "REVOKED");
+  const statusCfg = ACCESS_STATUS[displayStatus] || ACCESS_STATUS.PENDING;
   const assignedProgs = programmes.filter(p =>
     (member.programmes_assigned || []).includes(p.id)
   );
-  const initials = member.name
+  const displayName = member.user ? `${member.user.first_name} ${member.user.last_name}`.trim() : member.name;
+  const displayEmail = member.user?.email || member.email;
+  const displayPhone = member.user?.phone || member.phone;
+  const displayInstitution = member.user?.university || member.institution;
+  const displayJoined = member.joined_at || member.joined;
+
+  const initials = displayName
     .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
@@ -383,7 +390,7 @@ function MemberCard({ member, programmes, onRevoke, onReactivate, onRemove }) {
                 {initials}
               </div>
               {/* Online indicator */}
-              {member.status === "ACTIVE" && (
+              {displayStatus === "ACTIVE" && (
                 <div style={{ position:"absolute", bottom:1, right:1,
                   width:12, height:12, borderRadius:"50%",
                   background:"#059669",
@@ -393,7 +400,7 @@ function MemberCard({ member, programmes, onRevoke, onReactivate, onRemove }) {
             <div>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 <span style={{ fontSize:14, fontWeight:700, color:"#07162F" }}>
-                  {member.name}
+                  {displayName}
                 </span>
                 {member.is_demo && (
                   <span style={{ fontSize:9,
@@ -406,10 +413,10 @@ function MemberCard({ member, programmes, onRevoke, onReactivate, onRemove }) {
                 )}
               </div>
               <div style={{ fontSize:11, color:"#64748B", marginTop:2 }}>
-                {member.email}
+                {displayEmail}
               </div>
               <div style={{ fontSize:10, color:"#94A3B8", marginTop:1 }}>
-                {member.institution}
+                {displayInstitution}
               </div>
             </div>
           </div>
@@ -487,14 +494,14 @@ function MemberCard({ member, programmes, onRevoke, onReactivate, onRemove }) {
           {expanded ? "▲ Hide details" : "▼ Show access details"}
         </button>
         <div style={{ display:"flex", gap:7 }}>
-          {onRevoke && member.status === "ACTIVE" ? (
+          {onRevoke && displayStatus === "ACTIVE" ? (
             <button onClick={() => onRevoke(member.id)}
               style={{ ...S.actionBtn,
                 background:"#FEF3C7", color:"#92400E",
                 border:"1px solid #FCD34D" }}>
               🔒 Revoke Access
             </button>
-          ) : (onReactivate && member.status === "REVOKED") ? (
+          ) : (onReactivate && displayStatus === "REVOKED") ? (
             <button onClick={() => onReactivate(member.id)}
               style={{ ...S.actionBtn,
                 background:"#D1FAE5", color:"#065F46",
@@ -526,10 +533,10 @@ function MemberCard({ member, programmes, onRevoke, onReactivate, onRemove }) {
           <div style={{ display:"grid",
             gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
             {[
-              { l:"Member Since",  v:fmtDate(member.joined) },
+              { l:"Member Since",  v:fmtDate(displayJoined) },
               { l:"Role",          v:roleCfg.label },
               { l:"Access Level",  v:roleCfg.access.split("—")[0].trim() },
-              { l:"Phone",         v:member.phone || "—" },
+              { l:"Phone",         v:displayPhone || "—" },
             ].map((r,i)=>(
               <div key={i}>
                 <div style={{ fontSize:9, color:"#94A3B8",
@@ -846,9 +853,9 @@ export default function Team() {
         <div style={{ display:"flex", border:"1px solid #E2E8F0",
           borderRadius:7, overflow:"hidden" }}>
           {[["ALL","All Roles"],
-            ["PROFESSOR","Professor"],
-            ["NUC_STAFF","NUC Staff"],
-            ["OBSERVER","Observer"]
+            ["LEAD","Professor"],
+            ["MEMBER","NUC Staff"],
+            ["REVIEWER","Observer"]
           ].map(([v,label]) => (
             <button key={v} onClick={() => setRoleFilter(v)} style={{
               padding:"7px 13px", border:"none", cursor:"pointer",

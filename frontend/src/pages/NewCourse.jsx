@@ -141,6 +141,7 @@ export default function NewCourse() {
         department:      form.department,
         start_date:      form.start_date,
         student_count:   parseInt(form.student_count)       || 0,
+        staff_count:     parseInt(form.lecturer_count)      || 0,
         lecturer_count:  parseInt(form.lecturer_count)      || 0,
         full_time_lecturers: parseInt(form.full_time_lecturers) || 0,
         phd_holders:     parseInt(form.phd_holders)         || 0,

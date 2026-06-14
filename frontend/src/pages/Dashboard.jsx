@@ -162,11 +162,14 @@ function HODDashboard() {
         programmesAPI.list({ status:"IN_REVIEW" }),
         notificationsAPI.list(),
       ]);
-      setProgrammes([...(pRes.data||[]), ...(rRes.data||[])]);
+      // Only show programmes created by the current HOD user
+      const myProgrammes = [...(pRes.data||[]), ...(rRes.data||[])]
+        .filter(p => p.created_by === user.id);
+      setProgrammes(myProgrammes);
       setUnread((nRes.data||[]).filter(n=>!n.is_read).length);
     } catch(e){ console.error(e); }
     finally { setLoading(false); }
-  }, []);
+  }, [user]);
 
   useEffect(()=>{ load(); },[load]);
 

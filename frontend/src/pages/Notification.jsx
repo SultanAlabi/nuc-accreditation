@@ -19,6 +19,17 @@ const TYPE = {
   programme_approved: { label:"Programme Approved",  color:"#2563EB", bg:"#DBEAFE", border:"#BFDBFE", icon:"✓"  },
   ratio_warning:      { label:"Ratio Warning",       color:"#DC2626", bg:"#FEE2E2", border:"#FCA5A5", icon:"⚠"  },
   system:             { label:"System",              color:"#64748B", bg:"#F1F5F9", border:"#CBD5E1", icon:"ℹ"  },
+  // Backend notification types mapped to frontend display types
+  STATUS_CHANGE:      { label:"Status Change",       color:"#2563EB", bg:"#DBEAFE", border:"#BFDBFE", icon:"🔄" },
+  MILESTONE_DUE:      { label:"Milestone Due",       color:"#D97706", bg:"#FEF3C7", border:"#FCD34D", icon:"📅" },
+  DOCUMENT_VERIFIED:  { label:"Document Verified",   color:"#059669", bg:"#D1FAE5", border:"#6EE7B7", icon:"✅" },
+};
+
+// Map backend notification type → frontend TYPE key
+const BACKEND_TYPE_MAP = {
+  STATUS_CHANGE:      "STATUS_CHANGE",
+  MILESTONE_DUE:      "MILESTONE_DUE",
+  DOCUMENT_VERIFIED:  "DOCUMENT_VERIFIED",
 };
 
 // 2 demo entries only — rest comes from real backend
@@ -86,7 +97,8 @@ function ToastStack({ toasts }) {
 
 // ── Single notification row ───────────────────────────────────────────────────
 function NotifRow({ n, selected, onSelect, onRead, onDismiss, isDemo }) {
-  const cfg = TYPE[n.notification_type] || TYPE.system;
+  const typeKey = BACKEND_TYPE_MAP[n.type] || n.notification_type || "system";
+  const cfg = TYPE[typeKey] || TYPE.system;
   const unread = isUnread(n);
 
   return (
@@ -212,17 +224,35 @@ export default function Notifications() {
       const params = {
         page, page_size: PAGE_SIZE,
         ordering: "-created_at",
-        ...(typeFilter && { notification_type: typeFilter }),
+        ...(typeFilter && { type: typeFilter }),
         ...(readFilter !== "" && { read: readFilter }),
       };
       const res = await notificationsAPI.list(params);
       const data = res.data;
       if (data.results !== undefined) {
-        setItems(data.results);
+        // Normalize backend fields to frontend expectations
+        const normalized = data.results.map(n => ({
+          ...n,
+          notification_type: n.type || n.notification_type,
+          title: n.title || n.message || "",
+          body: n.body || n.message || "",
+          read: n.is_read ?? n.read,
+        }));
+        setItems(normalized);
         setTotalCount(data.count);
+      } else if (Array.isArray(data)) {
+        const normalized = data.map(n => ({
+          ...n,
+          notification_type: n.type || n.notification_type,
+          title: n.title || n.message || "",
+          body: n.body || n.message || "",
+          read: n.is_read ?? n.read,
+        }));
+        setItems(normalized);
+        setTotalCount(normalized.length);
       } else {
-        setItems(data);
-        setTotalCount(data.length);
+        setItems([]);
+        setTotalCount(0);
       }
       setUsingFallback(false);
     } catch {

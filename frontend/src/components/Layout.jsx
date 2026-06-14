@@ -1,14 +1,29 @@
 // src/components/layout/Layout.jsx
+import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
+import { notificationsAPI } from "../services/api";
 
 export default function Layout() {
   const { user } = useAuth();
+  const [notifCount, setNotifCount] = useState(0);
 
-  // You can fetch real notif count here later
-  // For now read from a stored value or default to 0
-  const notifCount = 3;
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await notificationsAPI.list({ page_size: 1 });
+        const data = res.data;
+        const total = data.count ?? (data.results ? data.results.length : (Array.isArray(data) ? data.length : 0));
+        if (!cancelled) setNotifCount(total);
+      } catch {
+        // Silently fail — navbar will show 0
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div style={{

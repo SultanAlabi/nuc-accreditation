@@ -8,11 +8,11 @@ import { programmesAPI } from "../services/api";
 const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 const STATUS_CONFIG = {
-  PENDING:    { label: "Pending",        bg: "#FEF3C7", color: "#D97706", border: "#FCD34D", dot: "#D97706" },
-  APPROVED:   { label: "Approved",       bg: "#DBEAFE", color: "#2563EB", border: "#BFDBFE", dot: "#2563EB" },
-  RESOURCE:   { label: "Resource Visit", bg: "#FEE2E2", color: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
-  ACCREDITED: { label: "Accredited",     bg: "#D1FAE5", color: "#059669", border: "#6EE7B7", dot: "#059669" },
-  REACCREDIT: { label: "Re-accredit",    bg: "#EDE9FE", color: "#7C3AED", border: "#C4B5FD", dot: "#7C3AED" },
+  PENDING:          { label: "Pending",          bg: "#FEF3C7", color: "#D97706", border: "#FCD34D", dot: "#D97706" },
+  IN_REVIEW:        { label: "In Review",        bg: "#DBEAFE", color: "#2563EB", border: "#BFDBFE", dot: "#2563EB" },
+  FORWARDED_TO_NUC: { label: "Forwarded to NUC", bg: "#EDE9FE", color: "#7C3AED", border: "#C4B5FD", dot: "#7C3AED" },
+  ACCREDITED:       { label: "Accredited",       bg: "#D1FAE5", color: "#059669", border: "#6EE7B7", dot: "#059669" },
+  DENIED:           { label: "Denied",           bg: "#FEE2E2", color: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
 };
 
 const FACULTIES = [
@@ -21,13 +21,13 @@ const FACULTIES = [
 ];
 
 const FALLBACK = [
-  { id:"C001", faculty:"Engineering",     department:"Computer Science",      name:"B.Eng. Computer Engineering", code:"CPE", start_date:"2022-09-01", status:"RESOURCE",   student_count:187, lecturer_count:14, document_counts:{marking_schemes:12,lesson_notes:45,ca_records:8,examiner_reports:3,staff_files:14} },
-  { id:"C002", faculty:"Sciences",        department:"Biochemistry",          name:"B.Sc. Biochemistry",           code:"BCH", start_date:"2021-03-15", status:"ACCREDITED", student_count:134, lecturer_count:11, document_counts:{marking_schemes:24,lesson_notes:78,ca_records:16,examiner_reports:6,staff_files:11} },
-  { id:"C003", faculty:"Law",             department:"Public Law",            name:"LL.B. Law",                    code:"LAW", start_date:"2020-01-10", status:"REACCREDIT", student_count:312, lecturer_count:22, document_counts:{marking_schemes:36,lesson_notes:120,ca_records:24,examiner_reports:10,staff_files:22} },
-  { id:"C004", faculty:"Medicine",        department:"Nursing Science",       name:"B.Sc. Nursing Science",        code:"NRS", start_date:"2024-09-01", status:"APPROVED",   student_count:89,  lecturer_count:9,  document_counts:{marking_schemes:4,lesson_notes:12,ca_records:2,examiner_reports:0,staff_files:9} },
-  { id:"C005", faculty:"Social Sciences", department:"Economics",             name:"B.Sc. Economics",              code:"ECN", start_date:"2023-06-01", status:"APPROVED",   student_count:210, lecturer_count:16, document_counts:{marking_schemes:8,lesson_notes:29,ca_records:5,examiner_reports:1,staff_files:16} },
-  { id:"C006", faculty:"Education",       department:"Educational Management",name:"B.Ed. Educational Management", code:"EDM", start_date:"2019-09-01", status:"REACCREDIT", student_count:156, lecturer_count:10, document_counts:{marking_schemes:40,lesson_notes:130,ca_records:28,examiner_reports:12,staff_files:10} },
-  { id:"C007", faculty:"Engineering",     department:"Electrical Engineering", name:"B.Eng. Electrical Engineering",code:"EEE", start_date:"2023-09-01", status:"PENDING",    student_count:0,   lecturer_count:8,  document_counts:{marking_schemes:0,lesson_notes:0,ca_records:0,examiner_reports:0,staff_files:8} },
+  { id:"C001", faculty:"Engineering",     department:"Computer Science",      name:"B.Eng. Computer Engineering", code:"CPE", start_date:"2022-09-01", status:"IN_REVIEW",        student_count:187, lecturer_count:14, document_counts:{marking_schemes:12,lesson_notes:45,ca_records:8,examiner_reports:3,staff_files:14} },
+  { id:"C002", faculty:"Sciences",        department:"Biochemistry",          name:"B.Sc. Biochemistry",           code:"BCH", start_date:"2021-03-15", status:"ACCREDITED",       student_count:134, lecturer_count:11, document_counts:{marking_schemes:24,lesson_notes:78,ca_records:16,examiner_reports:6,staff_files:11} },
+  { id:"C003", faculty:"Law",             department:"Public Law",            name:"LL.B. Law",                    code:"LAW", start_date:"2020-01-10", status:"FORWARDED_TO_NUC", student_count:312, lecturer_count:22, document_counts:{marking_schemes:36,lesson_notes:120,ca_records:24,examiner_reports:10,staff_files:22} },
+  { id:"C004", faculty:"Medicine",        department:"Nursing Science",       name:"B.Sc. Nursing Science",        code:"NRS", start_date:"2024-09-01", status:"ACCREDITED",       student_count:89,  lecturer_count:9,  document_counts:{marking_schemes:4,lesson_notes:12,ca_records:2,examiner_reports:0,staff_files:9} },
+  { id:"C005", faculty:"Social Sciences", department:"Economics",             name:"B.Sc. Economics",              code:"ECN", start_date:"2023-06-01", status:"ACCREDITED",       student_count:210, lecturer_count:16, document_counts:{marking_schemes:8,lesson_notes:29,ca_records:5,examiner_reports:1,staff_files:16} },
+  { id:"C006", faculty:"Education",       department:"Educational Management",name:"B.Ed. Educational Management", code:"EDM", start_date:"2019-09-01", status:"FORWARDED_TO_NUC", student_count:156, lecturer_count:10, document_counts:{marking_schemes:40,lesson_notes:130,ca_records:28,examiner_reports:12,staff_files:10} },
+  { id:"C007", faculty:"Engineering",     department:"Electrical Engineering", name:"B.Eng. Electrical Engineering",code:"EEE", start_date:"2023-09-01", status:"PENDING",          student_count:0,   lecturer_count:8,  document_counts:{marking_schemes:0,lesson_notes:0,ca_records:0,examiner_reports:0,staff_files:8} },
 ];
 
 // ── Helpers (all inline — no external imports needed) ─────────────────────────
@@ -44,11 +44,11 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString("en-NG",{day:"2-
 function getNextMilestone(p) {
   const today = new Date().toISOString().split("T")[0];
   const s = p.start_date;
-  if (["PENDING","APPROVED"].includes(p.status)) {
+  if (["PENDING","IN_REVIEW"].includes(p.status)) {
     const days = daysBetween(today, addYears(s,3));
     return { label:"Resource Visit", date:addYears(s,3), days, urgency:days<0?"overdue":days<90?"urgent":"normal" };
   }
-  if (["RESOURCE","ACCREDITED"].includes(p.status)) {
+  if (["FORWARDED_TO_NUC","ACCREDITED"].includes(p.status)) {
     const days = daysBetween(today, addYears(s,5));
     return { label:"Full Accreditation", date:addYears(s,5), days, urgency:days<0?"overdue":days<180?"urgent":"normal" };
   }
@@ -56,15 +56,15 @@ function getNextMilestone(p) {
   return { label:"Re-accreditation", date:addYears(s,10), days, urgency:days<0?"overdue":days<365?"urgent":"normal" };
 }
 
-function getNUCRatio(students, lecturers) {
-  if (!lecturers) return { ratio:"N/A", pass:false };
-  const n = students/lecturers;
+function getNUCRatio(students, staff) {
+  if (!staff) return { ratio:"N/A", pass:false };
+  const n = students/staff;
   return { ratio:`${n.toFixed(1)}:1`, pass:n<=30 };
 }
 
 function getReadinessScore(p) {
   const d = p.document_counts || {};
-  const { pass } = getNUCRatio(p.student_count, p.lecturer_count);
+  const { pass } = getNUCRatio(p.student_count, p.staff_count || p.lecturer_count);
   const checks = [
     (d.marking_schemes||0)>0, (d.lesson_notes||0)>10,
     (d.ca_records||0)>0, (d.examiner_reports||0)>0,
@@ -131,6 +131,7 @@ function AddProgrammeModal({ onClose, onSuccess }) {
       await programmesAPI.create({
         ...form,
         student_count:  parseInt(form.student_count)  || 0,
+        staff_count:    parseInt(form.lecturer_count) || 0,
         lecturer_count: parseInt(form.lecturer_count) || 0,
         status: "PENDING",
       });
@@ -228,7 +229,7 @@ function DetailPanel({ programme, onClose }) {
   const navigate = useNavigate();
   if (!programme) return null;
   const m = getNextMilestone(programme);
-  const { ratio, pass } = getNUCRatio(programme.student_count, programme.lecturer_count);
+  const { ratio, pass } = getNUCRatio(programme.student_count, programme.staff_count || programme.lecturer_count);
   const docs = programme.document_counts || {};
   const readiness = getReadinessScore(programme);
 
@@ -409,13 +410,7 @@ export default function Courses() {
         code: p.code || (p.name ? p.name.split(" ").map(w => w[0]).join("").replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() : "PRG"),
         start_date: p.start_date || p.created_at || new Date().toISOString(),
         lecturer_count: p.lecturer_count || p.staff_count || 0,
-        document_counts: p.document_counts || {
-          marking_schemes: 5,
-          lesson_notes: 12,
-          ca_records: 6,
-          examiner_reports: 2,
-          staff_files: p.staff_count || 5
-        }
+        document_counts: p.document_counts || {}
       }));
       setProgrammes(enriched);
       setUsingFallback(false);

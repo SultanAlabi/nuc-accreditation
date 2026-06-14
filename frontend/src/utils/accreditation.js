@@ -2,12 +2,12 @@
 // Shared helpers for milestone calculations, ratio checks, and readiness scoring
 
 export const STATUS_CONFIG = {
-  PENDING:    { label: "Pending Approval",   color: "#D97706", bg: "#FEF3C7", border: "#FCD34D", dot: "#D97706" },
-  APPROVED:   { label: "Take-off Approved",  color: "#2563EB", bg: "#DBEAFE", border: "#BFDBFE", dot: "#2563EB" },
-  RESOURCE:   { label: "Resource Visit Due", color: "#DC2626", bg: "#FEE2E2", border: "#FCA5A5", dot: "#DC2626" },
-  ACCREDITED: { label: "Fully Accredited",   color: "#059669", bg: "#D1FAE5", border: "#6EE7B7", dot: "#059669" },
-  REACCREDIT: { label: "Re-accreditation",   color: "#7C3AED", bg: "#EDE9FE", border: "#C4B5FD", dot: "#7C3AED" },
-  OVERDUE:    { label: "OVERDUE",            color: "#DC2626", bg: "#FEE2E2", border: "#FCA5A5", dot: "#CC0000" },
+  PENDING:          { label: "Pending",          color: "#D97706", bg: "#FEF3C7", border: "#FCD34D", dot: "#D97706" },
+  IN_REVIEW:        { label: "In Review",        color: "#2563EB", bg: "#DBEAFE", border: "#BFDBFE", dot: "#2563EB" },
+  FORWARDED_TO_NUC: { label: "Forwarded to NUC", color: "#7C3AED", bg: "#EDE9FE", border: "#C4B5FD", dot: "#7C3AED" },
+  ACCREDITED:       { label: "Accredited",       color: "#059669", bg: "#D1FAE5", border: "#6EE7B7", dot: "#059669" },
+  DENIED:           { label: "Denied",           color: "#DC2626", bg: "#FEE2E2", border: "#FCA5A5", dot: "#DC2626" },
+  OVERDUE:          { label: "OVERDUE",          color: "#DC2626", bg: "#FEE2E2", border: "#FCA5A5", dot: "#CC0000" },
 };
 
 export function daysBetween(d1, d2) {
@@ -36,12 +36,12 @@ export function getNextMilestone(course) {
   const fullAccredDate  = addYears(start, 5);
   const reaccredDate    = addYears(start, 10);
 
-  if (["PENDING", "APPROVED"].includes(course.status)) {
+  if (["PENDING", "IN_REVIEW"].includes(course.status)) {
     const days = daysBetween(today, resourceDate);
     return { label: "Resource Visit", date: resourceDate, days,
       urgency: days < 0 ? "overdue" : days < 90 ? "urgent" : "normal" };
   }
-  if (["RESOURCE", "ACCREDITED"].includes(course.status)) {
+  if (["FORWARDED_TO_NUC", "ACCREDITED"].includes(course.status)) {
     const days = daysBetween(today, fullAccredDate);
     return { label: "Full Accreditation", date: fullAccredDate, days,
       urgency: days < 0 ? "overdue" : days < 180 ? "urgent" : "normal" };
@@ -65,7 +65,7 @@ export function getReadinessScore(course) {
   const docs = course.docs || course.document_counts || {};
   const { pass } = getNUCRatio(
     course.students || course.student_count || 0,
-    course.lecturers || course.lecturer_count || 0
+    course.lecturers || course.lecturer_count || course.staff_count || 0
   );
   const checks = [
     (docs.marking_schemes   || docs.markingSchemes   || 0) > 0,

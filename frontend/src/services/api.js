@@ -62,6 +62,9 @@ export const programmesAPI = {
   update: (id, d)  => api.patch(`/programmes/${id}/`, d),
   delete: (id)     => api.delete(`/programmes/${id}/`),
   stats:  ()       => api.get("/programmes/stats/"),
+  submit:   (id)          => api.post(`/programmes/${id}/submit/`),
+  forward:  (id)          => api.post(`/programmes/${id}/forward/`),
+  decision: (id, data)    => api.post(`/programmes/${id}/decision/`, data),
 
   downloadReport: (id)     => api.get(`/programmes/${id}/report/`, {
     params: { format: "pdf" },

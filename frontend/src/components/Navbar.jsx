@@ -5,12 +5,12 @@ import { useRole } from "../hooks/useRole";
 import { useNavigate, useLocation, NavLink } from "react-router-dom";
 
 const ALL_NAV_LINKS = [
-  { to: "/dashboard",     label: "Dashboard",        icon: "▦",  roles: ["HOD","APU_OFFICER"] },
-  { to: "/courses",       label: "Courses",           icon: "⊟",  roles: ["HOD","APU_OFFICER"] },
-  { to: "/documents",     label: "Documents",         icon: "📁", roles: ["HOD","APU_OFFICER"] },
-  { to: "/calculator",    label: "Ratio Calculator",  icon: "⊞",  roles: ["HOD","APU_OFFICER","NUC_VISITOR"] },
-  { to: "/notifications", label: "Notifications",     icon: "🔔", roles: ["HOD","APU_OFFICER"] },
-  { to: "/team",          label: "Team Portal",       icon: "👥", roles: ["HOD","APU_OFFICER","NUC_VISITOR"] },
+  { to: "/dashboard",     label: "Dashboard",        icon: "▦",  roles: ["HOD","APU"] },
+  { to: "/courses",       label: "Courses",           icon: "⊟",  roles: ["HOD","APU"] },
+  { to: "/documents",     label: "Documents",         icon: "📁", roles: ["HOD","APU"] },
+  { to: "/calculator",    label: "Ratio Calculator",  icon: "⊞",  roles: ["HOD","APU","NUC_VISITOR"] },
+  { to: "/notifications", label: "Notifications",     icon: "🔔", roles: ["HOD","APU"] },
+  { to: "/team",          label: "Team Portal",       icon: "👥", roles: ["HOD","APU","NUC_VISITOR"] },
 ];
 
 // Page titles for the breadcrumb
