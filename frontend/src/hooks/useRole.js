@@ -1,53 +1,40 @@
-// src/hooks/useRole.js
-
-
 import { useAuth } from "../context/AuthContext";
 
-export const ROLES = {
-  HOD:         "HOD",
-  APU_OFFICER: "APU_OFFICER",
-  NUC_VISITOR: "NUC_VISITOR",
+export const STATUS = {
+  PENDING:          "PENDING",
+  IN_REVIEW:        "IN_REVIEW",
+  FORWARDED_TO_NUC: "FORWARDED_TO_NUC",
+  ACCREDITED:       "ACCREDITED",
+  DENIED:           "DENIED",
 };
+
+export const DOCUMENT_CATEGORIES = [
+  { value: "CURRICULUM", label: "Curriculum" },
+  { value: "STAFF_LIST", label: "Staff List" },
+  { value: "FACILITY",   label: "Facility"   },
+  { value: "FINANCIAL",  label: "Financial"  },
+  { value: "OTHER",      label: "Other"      },
+];
 
 export function useRole() {
   const { user } = useAuth();
   const role = user?.role || null;
-
+  
   return {
     role,
-    isHOD:        role === ROLES.HOD,
-    isAPU:        role === ROLES.APU_OFFICER,
-    isNUCVisitor: role === ROLES.NUC_VISITOR,
-    isStaff:      role === ROLES.HOD || role === ROLES.APU_OFFICER,
-
-    // Granular permissions
+    user,
+    isHOD: role === "HOD",
+    isAPU: role === "APU",
+    isNUC: role === "NUC_VISITOR",
     can: {
-      // Programmes
-      viewAllProgrammes:    role === ROLES.APU_OFFICER,
-      createProgramme:      role === ROLES.HOD || role === ROLES.APU_OFFICER,
-      approveProgramme:     role === ROLES.APU_OFFICER,
-      editProgramme:        role === ROLES.HOD || role === ROLES.APU_OFFICER,
-      deleteProgramme:      role === ROLES.APU_OFFICER,
-
-      // Documents
-      uploadDocument:       role === ROLES.HOD || role === ROLES.APU_OFFICER,
-      editDocument:         role === ROLES.HOD || role === ROLES.APU_OFFICER,
-      deleteDocument:       role === ROLES.HOD || role === ROLES.APU_OFFICER,
-      verifyDocument:       role === ROLES.APU_OFFICER,
-      viewUnverifiedDocs:   role === ROLES.HOD || role === ROLES.APU_OFFICER,
-
-      // Team
-      manageTeam:           role === ROLES.APU_OFFICER,
-      inviteTeamMember:     role === ROLES.APU_OFFICER,
-
-      // Notifications
-      viewNotifications:    role === ROLES.HOD || role === ROLES.APU_OFFICER,
-
-      // Navigation
-      viewDashboard:        role === ROLES.HOD || role === ROLES.APU_OFFICER,
-      viewTeamPortal:       true, // all roles, but different views
-      viewCalculator:       true,
-      viewSettings:         true,
+      createProgramme: role === "HOD",
+      submitForReview: role === "HOD",
+      forwardToNUC:    role === "APU",
+      accreditOrDeny:  role === "NUC_VISITOR",
+      uploadDocument:  role === "HOD",
+      verifyDocument:  role === "APU",
+      deleteDocument:  role === "HOD" || role === "APU",
+      manageTeam:      role === "APU",
     },
   };
 }

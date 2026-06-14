@@ -1,692 +1,603 @@
+
 // src/pages/Dashboard.jsx
+// NO role restriction on this route — all three roles land here.
+// Internally renders HODDashboard, APUDashboard, or NUCDashboard based on role.
+
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useRole, STATUS } from "../hooks/useRole";
+import { programmesAPI, notificationsAPI } from "../services/api";
 
-// ── Config ────────────────────────────────────────────────────────────────────
-const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
-const STATUS_CONFIG = {
-  PENDING:    { label: "Pending",        bg: "#FEF3C7", color: "#D97706", border: "#FCD34D", dot: "#D97706" },
-  APPROVED:   { label: "Approved",       bg: "#DBEAFE", color: "#2563EB", border: "#BFDBFE", dot: "#2563EB" },
-  RESOURCE:   { label: "Resource Visit", bg: "#FEE2E2", color: "#DC2626", border: "#FCA5A5", dot: "#DC2626" },
-  ACCREDITED: { label: "Accredited",     bg: "#D1FAE5", color: "#059669", border: "#6EE7B7", dot: "#059669" },
-  REACCREDIT: { label: "Re-accredit",    bg: "#EDE9FE", color: "#7C3AED", border: "#C4B5FD", dot: "#7C3AED" },
+const PAGE   = { fontFamily:"'Segoe UI',Arial,sans-serif", background:"#F0F4F8", minHeight:"100vh", padding:"32px 36px" };
+const H1     = { fontSize:26, fontWeight:700, color:"#07162F", margin:"0 0 5px" };
+const SUB    = { fontSize:13, color:"#64748B", margin:0 };
+const LABEL  = { fontSize:10, fontWeight:700, fontFamily:"monospace", color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:12 };
+const BP     = { padding:"9px 18px", borderRadius:7, cursor:"pointer", fontFamily:"monospace", fontWeight:700, fontSize:12, background:"linear-gradient(135deg,#07162F,#0C2D5E)", color:"#fff", border:"none" };
+const BS     = { padding:"9px 14px", borderRadius:7, cursor:"pointer", fontFamily:"monospace", fontWeight:700, fontSize:12, background:"#fff", color:"#374151", border:"1.5px solid #CBD5E1" };
+const BPURP  = { padding:"9px 14px", borderRadius:7, cursor:"pointer", fontFamily:"monospace", fontWeight:700, fontSize:12, background:"#7C3AED", color:"#fff", border:"none" };
+const BGREEN = { padding:"9px 14px", borderRadius:7, cursor:"pointer", fontFamily:"monospace", fontWeight:700, fontSize:12, background:"#059669", color:"#fff", border:"none" };
+const BRED   = { padding:"9px 14px", borderRadius:7, cursor:"pointer", fontFamily:"monospace", fontWeight:700, fontSize:12, background:"#DC2626", color:"#fff", border:"none" };
+
+const STATUS_CFG = {
+  PENDING:          { label:"Pending",          bg:"#FEF3C7", color:"#D97706", dot:"#D97706", border:"#FCD34D" },
+  IN_REVIEW:        { label:"In Review",         bg:"#DBEAFE", color:"#2563EB", dot:"#2563EB", border:"#BFDBFE" },
+  FORWARDED_TO_NUC: { label:"Forwarded to NUC", bg:"#EDE9FE", color:"#7C3AED", dot:"#7C3AED", border:"#C4B5FD" },
+  ACCREDITED:       { label:"Accredited",        bg:"#D1FAE5", color:"#059669", dot:"#059669", border:"#6EE7B7" },
+  DENIED:           { label:"Denied",            bg:"#FEE2E2", color:"#DC2626", dot:"#DC2626", border:"#FCA5A5" },
 };
 
-const FALLBACK = [
-  { id:"C001", faculty:"Engineering",    department:"Computer Science", name:"B.Eng. Computer Engineering", code:"CPE", start_date:"2022-09-01", status:"RESOURCE",   student_count:187, lecturer_count:14, document_counts:{marking_schemes:12,lesson_notes:45,ca_records:8,examiner_reports:3,staff_files:14} },
-  { id:"C002", faculty:"Sciences",       department:"Biochemistry",     name:"B.Sc. Biochemistry",           code:"BCH", start_date:"2021-03-15", status:"ACCREDITED", student_count:134, lecturer_count:11, document_counts:{marking_schemes:24,lesson_notes:78,ca_records:16,examiner_reports:6,staff_files:11} },
-  { id:"C003", faculty:"Law",            department:"Public Law",       name:"LL.B. Law",                    code:"LAW", start_date:"2020-01-10", status:"REACCREDIT", student_count:312, lecturer_count:22, document_counts:{marking_schemes:36,lesson_notes:120,ca_records:24,examiner_reports:10,staff_files:22} },
-  { id:"C004", faculty:"Medicine",       department:"Nursing Science",  name:"B.Sc. Nursing Science",        code:"NRS", start_date:"2024-09-01", status:"APPROVED",   student_count:89,  lecturer_count:9,  document_counts:{marking_schemes:4,lesson_notes:12,ca_records:2,examiner_reports:0,staff_files:9} },
-  { id:"C005", faculty:"Social Sciences",department:"Economics",        name:"B.Sc. Economics",              code:"ECN", start_date:"2023-06-01", status:"APPROVED",   student_count:210, lecturer_count:16, document_counts:{marking_schemes:8,lesson_notes:29,ca_records:5,examiner_reports:1,staff_files:16} },
-];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function addYears(d, y) {
-  const x = new Date(d);
-  x.setFullYear(x.getFullYear() + y);
-  return x.toISOString().split("T")[0];
-}
-function daysBetween(a, b) {
-  return Math.round((new Date(b) - new Date(a)) / 86400000);
-}
-function fmt(d) {
-  return d ? new Date(d).toLocaleDateString("en-NG",
-    { day:"2-digit", month:"short", year:"numeric" }) : "—";
-}
-function getMilestone(p) {
-  const today = new Date().toISOString().split("T")[0];
-  const s = p.start_date;
-  if (["PENDING","APPROVED"].includes(p.status)) {
-    const days = daysBetween(today, addYears(s, 3));
-    return { label:"Resource Visit", date:addYears(s,3), days,
-      urgency: days < 0 ? "overdue" : days < 90 ? "urgent" : "normal" };
-  }
-  if (["RESOURCE","ACCREDITED"].includes(p.status)) {
-    const days = daysBetween(today, addYears(s, 5));
-    return { label:"Full Accreditation", date:addYears(s,5), days,
-      urgency: days < 0 ? "overdue" : days < 180 ? "urgent" : "normal" };
-  }
-  const days = daysBetween(today, addYears(s, 10));
-  return { label:"Re-accreditation", date:addYears(s,10), days,
-    urgency: days < 0 ? "overdue" : days < 365 ? "urgent" : "normal" };
-}
-function getRatio(s, l) {
-  if (!l) return { ratio:"N/A", pass:false };
-  const n = s / l;
-  return { ratio:`${n.toFixed(1)}:1`, pass: n <= 30 };
-}
-function getReadiness(p) {
-  const d = p.document_counts || {};
-  const { pass } = getRatio(p.student_count, p.lecturer_count);
-  const checks = [
-    (d.marking_schemes||0)>0, (d.lesson_notes||0)>10,
-    (d.ca_records||0)>0, (d.examiner_reports||0)>0,
-    (d.staff_files||0)>0, pass,
-  ];
-  return Math.round(checks.filter(Boolean).length / checks.length * 100);
-}
-function uc(u) { return u==="overdue"?"#DC2626":u==="urgent"?"#D97706":"#059669"; }
-function ubg(u){ return u==="overdue"?"#FEE2E2":u==="urgent"?"#FEF3C7":"#D1FAE5"; }
-
-// ── Atoms ─────────────────────────────────────────────────────────────────────
+// ── Shared atoms ──────────────────────────────────────────────────────────────
 function Badge({ status }) {
-  const c = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
+  const s = STATUS_CFG[status] || STATUS_CFG.PENDING;
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:5,
-      padding:"3px 9px", borderRadius:4,
-      background:c.bg, color:c.color, border:`1px solid ${c.border}`,
-      fontFamily:"'IBM Plex Mono',monospace", fontSize:10,
-      fontWeight:700, textTransform:"uppercase", whiteSpace:"nowrap" }}>
-      <span style={{ width:5, height:5, borderRadius:"50%", background:c.dot }}/>
-      {c.label}
+      padding:"3px 10px", borderRadius:4, background:s.bg, color:s.color,
+      border:`1px solid ${s.border}`, fontFamily:"monospace",
+      fontSize:10, fontWeight:700, textTransform:"uppercase", whiteSpace:"nowrap" }}>
+      <span style={{ width:6, height:6, borderRadius:"50%", background:s.dot }}/>
+      {s.label}
     </span>
   );
 }
 
-function Bar({ value }) {
-  const color = value>=80?"#059669":value>=50?"#D97706":"#DC2626";
+function KPI({ label, value, sub, color, icon, loading, onClick, accent }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-      <div style={{ flex:1, height:5, background:"#E5E7EB",
-        borderRadius:9999, overflow:"hidden" }}>
-        <div style={{ width:`${value}%`, height:"100%",
-          background:color, borderRadius:9999,
-          transition:"width 0.7s ease" }}/>
+    <div onClick={onClick} style={{
+      background:"#fff", border:"1px solid #E2E8F0",
+      borderTop:`3px solid ${accent||"#E2E8F0"}`,
+      borderRadius:10, padding:"20px 22px",
+      boxShadow:"0 1px 4px rgba(7,22,47,0.06)",
+      cursor:onClick?"pointer":"default", transition:"all 0.15s" }}
+      onMouseEnter={e=>{if(onClick){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(7,22,47,0.1)";}}}
+      onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(7,22,47,0.06)";}}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <div>
+          <div style={{ fontSize:9, color:"#94A3B8", fontFamily:"monospace",
+            letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:8 }}>{label}</div>
+          {loading
+            ? <div style={{ height:34, width:64, background:"#F1F5F9", borderRadius:6, animation:"pulse 1.5s infinite" }}/>
+            : <div style={{ fontSize:32, fontWeight:700, color:color||"#07162F", fontFamily:"monospace", lineHeight:1 }}>{value??0}</div>}
+          <div style={{ fontSize:11, color:"#94A3B8", marginTop:6 }}>{sub}</div>
+        </div>
+        <span style={{ fontSize:24, opacity:0.08 }}>{icon}</span>
       </div>
-      <span style={{ fontFamily:"'IBM Plex Mono',monospace",
-        fontSize:10, fontWeight:700, color, minWidth:32 }}>
-        {value}%
-      </span>
     </div>
   );
 }
 
-// ── Programme Detail Modal ────────────────────────────────────────────────────
-function ProgrammeModal({ programme, onClose, onNavigate }) {
+function QuickLink({ icon, label, sub, action }) {
+  return (
+    <div onClick={action} style={{ background:"#fff", border:"1px solid #E2E8F0",
+      borderRadius:10, padding:"16px 18px", cursor:"pointer",
+      boxShadow:"0 1px 4px rgba(7,22,47,0.06)", transition:"all 0.15s" }}
+      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(7,22,47,0.1)";}}
+      onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(7,22,47,0.06)";}}>
+      <div style={{ fontSize:24, marginBottom:8 }}>{icon}</div>
+      <div style={{ fontSize:13, fontWeight:700, color:"#07162F" }}>{label}</div>
+      <div style={{ fontSize:11, color:"#94A3B8", marginTop:3 }}>{sub}</div>
+    </div>
+  );
+}
+
+function DenyModal({ programme, onConfirm, onClose, loading }) {
+  const [comment, setComment] = useState("");
   if (!programme) return null;
-  const m = getMilestone(programme);
-  const { ratio, pass } = getRatio(programme.student_count, programme.lecturer_count);
-  const docs = programme.document_counts || {};
-  const readiness = getReadiness(programme);
-
-  const workflow = [
-    { step:"Application",            done:true },
-    { step:"Approval / Take-off",    done:["APPROVED","RESOURCE","ACCREDITED","REACCREDIT"].includes(programme.status) },
-    { step:"Resource Visit (Yr 3)",  done:["RESOURCE","ACCREDITED","REACCREDIT"].includes(programme.status) },
-    { step:"Full Accreditation (Yr 5)", done:["ACCREDITED","REACCREDIT"].includes(programme.status) },
-    { step:"Re-accreditation",       done:programme.status==="REACCREDIT" },
-  ];
-
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0,
       background:"rgba(7,22,47,0.75)", display:"flex",
       alignItems:"center", justifyContent:"center",
       zIndex:500, backdropFilter:"blur(4px)" }}>
       <div onClick={e=>e.stopPropagation()} style={{
-        background:"#fff", borderRadius:12,
-        width:"min(800px,95vw)", maxHeight:"90vh", overflowY:"auto",
-        boxShadow:"0 25px 80px rgba(7,22,47,0.35)",
-        border:"1px solid #CBD5E1" }}>
-
-        {/* Header */}
-        <div style={{ background:"linear-gradient(135deg,#07162F,#0C2D5E)",
-          padding:"24px 28px 20px", borderRadius:"12px 12px 0 0",
-          position:"relative" }}>
-          <button onClick={onClose} style={{ position:"absolute", top:14, right:14,
-            width:30, height:30, borderRadius:"50%",
-            background:"rgba(255,255,255,0.1)", border:"none",
-            color:"#fff", fontSize:18, cursor:"pointer",
-            display:"flex", alignItems:"center", justifyContent:"center" }}>
-            ×
+        background:"#fff", borderRadius:12, width:"min(480px,95vw)",
+        padding:"28px", boxShadow:"0 25px 80px rgba(7,22,47,0.35)" }}>
+        <h3 style={{ fontSize:18, fontWeight:700, color:"#DC2626", margin:"0 0 6px" }}>
+          Deny Programme
+        </h3>
+        <p style={{ fontSize:13, color:"#64748B", margin:"0 0 16px" }}>
+          <strong>{programme.name}</strong> — provide a reason. This will be sent to the HOD.
+        </p>
+        <label style={{ display:"block", fontSize:11, fontFamily:"monospace",
+          fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase",
+          color:"#374151", marginBottom:7 }}>
+          Reason for Denial *
+        </label>
+        <textarea value={comment} onChange={e=>setComment(e.target.value)}
+          placeholder="Provide a clear reason why this programme is being denied…"
+          rows={4} style={{ width:"100%", padding:"10px 13px",
+            border:"1.5px solid #CBD5E1", borderRadius:7,
+            fontFamily:"'Segoe UI',Arial,sans-serif", fontSize:13,
+            color:"#07162F", background:"#fff", outline:"none",
+            boxSizing:"border-box", resize:"vertical", marginBottom:16 }}/>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={onClose} style={BS}>Cancel</button>
+          <button onClick={()=>onConfirm(comment)}
+            disabled={!comment.trim()||loading}
+            style={{ ...BRED, opacity:(!comment.trim()||loading)?0.5:1 }}>
+            {loading?"Submitting…":"Confirm Deny"}
           </button>
-          <div style={{ color:"#94A3B8", fontSize:9,
-            fontFamily:"'IBM Plex Mono',monospace",
-            letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:5 }}>
-            {programme.code} · {programme.faculty} · {programme.department}
-          </div>
-          <div style={{ color:"#fff", fontSize:20,
-            fontWeight:700, marginBottom:10 }}>
-            {programme.name}
-          </div>
-          <Badge status={programme.status}/>
-        </div>
-
-        <div style={{ padding:"24px 28px",
-          display:"flex", flexDirection:"column", gap:22 }}>
-
-          {/* Workflow */}
-          <div>
-            <div style={SL}>NUC Accreditation Workflow</div>
-            <div style={{ display:"flex", alignItems:"center" }}>
-              {workflow.map((w,i) => (
-                <div key={i} style={{ display:"flex", alignItems:"center",
-                  flex:i<4?1:0 }}>
-                  <div style={{ display:"flex", flexDirection:"column",
-                    alignItems:"center", gap:4 }}>
-                    <div style={{ width:26, height:26, borderRadius:"50%",
-                      background:w.done?"#059669":"#E5E7EB",
-                      color:w.done?"#fff":"#9CA3AF",
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      fontSize:10, fontWeight:700,
-                      border:`2px solid ${w.done?"#047857":"#D1D5DB"}` }}>
-                      {w.done?"✓":i+1}
-                    </div>
-                    <span style={{ fontSize:8, textAlign:"center", maxWidth:60,
-                      color:w.done?"#065F46":"#9CA3AF",
-                      fontFamily:"'IBM Plex Mono',monospace",
-                      fontWeight:w.done?700:400, lineHeight:1.3 }}>
-                      {w.step}
-                    </span>
-                  </div>
-                  {i<4 && <div style={{ flex:1, height:2, margin:"0 3px",
-                    marginBottom:20,
-                    background:w.done?"#059669":"#E5E7EB" }}/>}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
-            {[
-              {l:"Students",      v:(programme.student_count||0).toLocaleString()},
-              {l:"Lecturers",     v:programme.lecturer_count||0},
-              {l:"Ratio",         v:ratio, note:pass?"✓ Meets NUC Standard":"✗ Below Standard", nc:pass?"#059669":"#DC2626"},
-              {l:"Start Date",    v:fmt(programme.start_date)},
-              {l:"Next Milestone",v:m.label},
-              {l:"Readiness",     v:`${readiness}%`},
-            ].map((s,i)=>(
-              <div key={i} style={{ background:"#F8FAFC",
-                border:"1px solid #E2E8F0", borderRadius:7,
-                padding:"11px 13px" }}>
-                <div style={{ fontSize:9, color:"#94A3B8",
-                  fontFamily:"'IBM Plex Mono',monospace",
-                  textTransform:"uppercase", letterSpacing:"0.1em",
-                  marginBottom:4 }}>{s.l}</div>
-                <div style={{ fontSize:18, fontWeight:700, color:"#07162F",
-                  fontFamily:"'IBM Plex Mono',monospace" }}>{s.v}</div>
-                {s.note && <div style={{ fontSize:10, color:s.nc,
-                  marginTop:2, fontWeight:600 }}>{s.note}</div>}
-              </div>
-            ))}
-          </div>
-
-          {/* Evidence locker */}
-          <div>
-            <div style={SL}>Evidence Locker</div>
-            <div style={{ display:"flex", flexWrap:"wrap", gap:7 }}>
-              {[
-                ["Marking Schemes","marking_schemes"],
-                ["Lesson Notes","lesson_notes"],
-                ["CA Records","ca_records"],
-                ["Examiner Reports","examiner_reports"],
-                ["Staff Files","staff_files"],
-              ].map(([label,key])=>{
-                const count = docs[key]||0;
-                return (
-                  <span key={key} style={{ display:"inline-flex",
-                    alignItems:"center", gap:4, padding:"3px 9px",
-                    borderRadius:4, fontSize:11,
-                    fontFamily:"'IBM Plex Mono',monospace",
-                    background:count>0?"#EFF6FF":"#F9FAFB",
-                    border:`1px solid ${count>0?"#BFDBFE":"#E5E7EB"}`,
-                    color:count>0?"#1D4ED8":"#9CA3AF" }}>
-                    {count>0?"📄":"○"} {label} ({count})
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Readiness */}
-          <div>
-            <div style={SL}>Accreditation Readiness</div>
-            <Bar value={readiness}/>
-          </div>
-
-          {/* Action buttons — navigate to real pages */}
-          <div style={{ display:"flex", gap:9, flexWrap:"wrap" }}>
-            <button onClick={()=>{ onClose(); onNavigate(`/courses/${programme.id}`); }}
-              style={BP}>
-              📋 View Full Detail
-            </button>
-            <button onClick={()=>{ onClose(); onNavigate(`/documents?programme=${programme.id}`); }}
-              style={BS}>
-              📤 Upload Documents
-            </button>
-            <button onClick={()=>{ onClose(); onNavigate(`/courses/${programme.id}`); }}
-              style={BS}>
-              ✏ Edit Programme
-            </button>
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const SL = {
-  fontSize:10, fontWeight:700, letterSpacing:"0.12em",
-  color:"#6B7280", textTransform:"uppercase", marginBottom:12,
-  fontFamily:"'IBM Plex Mono',monospace",
-};
-const BP = {
-  padding:"9px 16px", borderRadius:7, cursor:"pointer",
-  fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, fontSize:12,
-  background:"linear-gradient(135deg,#07162F,#0C2D5E)",
-  color:"#fff", border:"none",
-};
-const BS = {
-  padding:"9px 16px", borderRadius:7, cursor:"pointer",
-  fontFamily:"'IBM Plex Mono',monospace", fontWeight:700, fontSize:12,
-  background:"#fff", color:"#374151", border:"1.5px solid #CBD5E1",
-};
+function ToastMsg({ toast }) {
+  if (!toast) return null;
+  return (
+    <div style={{ position:"fixed", bottom:24, right:24, zIndex:9999,
+      background:toast.type==="error"?"#DC2626":"#059669",
+      color:"#fff", padding:"12px 20px", borderRadius:8,
+      fontSize:13, fontWeight:600, minWidth:240,
+      boxShadow:"0 8px 24px rgba(7,22,47,0.25)",
+      borderLeft:`3px solid ${toast.type==="error"?"#FCA5A5":"#6EE7B7"}`,
+      animation:"fadeIn 0.2s ease" }}>
+      {toast.type==="error"?"⚠ ":"✓ "}{toast.msg}
+    </div>
+  );
+}
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
-export default function Dashboard() {
+function useToast() {
+  const [toast, setToast] = useState(null);
+  const show = (msg, type="success") => {
+    setToast({ msg, type });
+    setTimeout(()=>setToast(null), 3500);
+  };
+  return { toast, show };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOD DASHBOARD — My programmes (PENDING + IN_REVIEW), submit buttons
+// ═══════════════════════════════════════════════════════════════════════════════
+function HODDashboard() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
-  const [programmes,    setProgrammes]    = useState([]);
-  const [stats,         setStats]         = useState(null);
-  const [loading,       setLoading]       = useState(true);
-  const [selected,      setSelected]      = useState(null);
-  const [filter,        setFilter]        = useState("ALL");
-  const [usingFallback, setUsingFallback] = useState(false);
+  const { user } = useAuth();
+  const { toast, show } = useToast();
+  const [programmes, setProgrammes] = useState([]);
+  const [unread,     setUnread]     = useState(0);
+  const [loading,    setLoading]    = useState(true);
+  const [actionLoad, setActionLoad] = useState({});
 
-  const user = JSON.parse(localStorage.getItem("nuc_user") || '{}');
-  const now  = new Date();
-
-  // ── Load data ──────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("nuc_token");
-      const headers = token ? { Authorization:`Token ${token}` } : {};
-
-      const [progRes, statsRes] = await Promise.all([
-        fetch(`${API}/programmes/`, { headers }).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
-        fetch(`${API}/dashboard/summary/`, { headers }).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
+      const [pRes, rRes, nRes] = await Promise.all([
+        programmesAPI.list({ status:"PENDING" }),
+        programmesAPI.list({ status:"IN_REVIEW" }),
+        notificationsAPI.list(),
       ]);
-      setProgrammes(progRes.results || progRes);
-      setStats(statsRes);
-      setUsingFallback(false);
-    } catch {
-      setProgrammes(FALLBACK);
-      setUsingFallback(true);
-      setStats({
-        total_programmes: FALLBACK.length,
-        accredited:       FALLBACK.filter(p=>p.status==="ACCREDITED").length,
-        alerts_count:     FALLBACK.filter(p=>getMilestone(p).urgency!=="normal").length,
-        total_documents:  847,
-      });
-    } finally {
-      setLoading(false);
-    }
+      setProgrammes([...(pRes.data||[]), ...(rRes.data||[])]);
+      setUnread((nRes.data||[]).filter(n=>!n.is_read).length);
+    } catch(e){ console.error(e); }
+    finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(()=>{ load(); },[load]);
 
-  const displayed = filter === "ALL"
-    ? programmes
-    : programmes.filter(p => p.status === filter);
+  const handleSubmit = async (id) => {
+    setActionLoad(p=>({...p,[id]:"submit"}));
+    try {
+      await programmesAPI.submit(id);
+      show("Programme submitted for APU review.");
+      load();
+    } catch(e){ show(e.response?.data?.error||"Failed to submit.","error"); }
+    finally { setActionLoad(p=>({...p,[id]:null})); }
+  };
 
-  const alerts = programmes.filter(p => getMilestone(p).urgency !== "normal");
+  const pending  = programmes.filter(p=>p.status==="PENDING");
+  const inReview = programmes.filter(p=>p.status==="IN_REVIEW");
 
   return (
-    <div style={{ fontFamily:"'IBM Plex Sans','Segoe UI',sans-serif",
-      background:"#F0F4F8", minHeight:"100vh", padding:"32px 36px" }}>
+    <div style={PAGE}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}} @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}`}</style>
 
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-      `}</style>
-
-      {/* ── Header ── */}
-      <div style={{ marginBottom:28 }}>
-        <div style={{ fontSize:10, color:"#94A3B8",
-          fontFamily:"'IBM Plex Mono',monospace",
-          letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4 }}>
-          Academic Planning Unit · {now.toLocaleDateString("en-NG",
-            { weekday:"long", day:"2-digit", month:"long", year:"numeric" })}
+      <div style={{ marginBottom:28, display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div style={{ fontSize:10, color:"#94A3B8", fontFamily:"monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4 }}>Head of Department</div>
+          <h1 style={H1}>My Dashboard</h1>
+          <p style={SUB}>Welcome back, {user?.first_name||"HOD"}. Here's where your programmes stand.</p>
         </div>
-        <div style={{ display:"flex", justifyContent:"space-between",
-          alignItems:"flex-end", flexWrap:"wrap", gap:12 }}>
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={load} style={BS}>🔄 Refresh</button>
+          <button onClick={()=>navigate("/courses/new")} style={BP}>+ New Programme</button>
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:28 }}>
+        <KPI label="Total Programmes"  value={programmes.length} sub="All my submissions"  color="#07162F" icon="◈"  loading={loading} accent="#07162F"/>
+        <KPI label="Pending"           value={pending.length}    sub="Need submission"     color="#D97706" icon="⏳" loading={loading} accent="#D97706"/>
+        <KPI label="In Review"         value={inReview.length}   sub="With APU Officer"   color="#2563EB" icon="🔍" loading={loading} accent="#2563EB"/>
+        <KPI label="Unread Alerts"     value={unread}            sub="Notifications"       color="#DC2626" icon="🔔" loading={loading} accent="#DC2626" onClick={()=>navigate("/notifications")}/>
+      </div>
+
+      {!loading && pending.length>0 && (
+        <div style={{ background:"linear-gradient(135deg,#FEF3C7,#FDE68A)", border:"1px solid #F59E0B",
+          borderRadius:10, padding:"14px 20px", marginBottom:24,
+          display:"flex", alignItems:"center", gap:12 }}>
+          <span style={{ fontSize:20 }}>⚡</span>
           <div>
-            <h1 style={{ fontSize:26, fontWeight:700,
-              color:"#07162F", margin:"0 0 4px" }}>
-              Accreditation Readiness Dashboard
-            </h1>
-            <p style={{ fontSize:13, color:"#64748B", margin:0 }}>
-              Welcome back, {user.first_name || "Officer"} — here's your programme overview.
-            </p>
+            <div style={{ fontWeight:700, color:"#92400E", fontSize:13 }}>{pending.length} programme{pending.length>1?"s":""} awaiting your submission</div>
+            <div style={{ fontSize:12, color:"#78350F", marginTop:2 }}>Submit them to APU to move the accreditation process forward.</div>
           </div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button onClick={load} style={{ ...BS,
-              display:"flex", alignItems:"center", gap:6,
-              opacity: loading ? 0.6 : 1 }}>
-              🔄 Refresh
-            </button>
-            <button onClick={() => navigate("/courses/new")}
-              style={{ ...BP, display:"flex", alignItems:"center", gap:6 }}>
-              + New Programme
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Demo banner */}
-      {usingFallback && (
-        <div style={{ background:"#EFF6FF", border:"1px solid #BFDBFE",
-          borderRadius:8, padding:"10px 16px", marginBottom:20,
-          fontSize:12, color:"#1D4ED8",
-          display:"flex", gap:8, alignItems:"center" }}>
-          ℹ <strong>Demo mode</strong> — connect your Django backend at{" "}
-          <code style={{ fontFamily:"'IBM Plex Mono',monospace",
-            background:"#DBEAFE", padding:"1px 5px", borderRadius:3 }}>
-            {API}
-          </code>{" "}to load live data.
         </div>
       )}
 
-      {/* ── KPI Row ── */}
-      <div style={{ display:"grid",
-        gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:24 }}>
-        {[
-          { icon:"◈", label:"Total Programmes",    value:stats?.total_programmes ?? "—", sub:"Under Management",  color:"#07162F", click: ()=>navigate("/courses") },
-          { icon:"⚠", label:"Accreditation Alerts",value:stats?.alerts_count ?? "—",    sub:"Require Attention", color:"#DC2626", click: ()=>navigate("/notifications") },
-          { icon:"✓", label:"Fully Accredited",    value:stats?.accredited ?? "—",       sub:"Programmes",        color:"#059669", click: ()=>navigate("/courses") },
-          { icon:"📄", label:"Documents Stored",   value:(stats?.total_documents??0).toLocaleString(), sub:"Across All Lockers", color:"#2563EB", click: ()=>navigate("/documents") },
-        ].map((k,i) => (
-          <div key={i} onClick={k.click} style={{
-            background:"#fff", border:"1px solid #E2E8F0",
-            borderRadius:10, padding:"20px 22px",
-            boxShadow:"0 1px 4px rgba(7,22,47,0.06)",
-            cursor:"pointer", transition:"all 0.15s",
-          }}
-            onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 6px 20px rgba(7,22,47,0.1)";e.currentTarget.style.transform="translateY(-1px)";}}
-            onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 4px rgba(7,22,47,0.06)";e.currentTarget.style.transform="none";}}>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <div>
-                <div style={{ fontSize:10, color:"#94A3B8",
-                  fontFamily:"'IBM Plex Mono',monospace",
-                  letterSpacing:"0.12em", textTransform:"uppercase",
-                  marginBottom:8 }}>{k.label}</div>
-                {loading
-                  ? <div style={{ height:32, width:64, background:"#F1F5F9",
-                      borderRadius:6, animation:"pulse 1.5s infinite" }}/>
-                  : <div style={{ fontSize:32, fontWeight:700, color:k.color,
-                      fontFamily:"'IBM Plex Mono',monospace", lineHeight:1 }}>
-                      {k.value}
-                    </div>}
-                <div style={{ fontSize:11, color:"#94A3B8", marginTop:6 }}>
-                  {k.sub}
-                </div>
-              </div>
-              <span style={{ fontSize:24, opacity:0.12 }}>{k.icon}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Alert Banner ── */}
-      {!loading && alerts.length > 0 && (
-        <div style={{ background:"linear-gradient(135deg,#FEF3C7,#FDE68A)",
-          border:"1px solid #F59E0B", borderRadius:8,
-          padding:"14px 20px", marginBottom:24,
-          display:"flex", alignItems:"flex-start", gap:12 }}>
-          <span style={{ fontSize:18, flexShrink:0, marginTop:1 }}>⚠</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontWeight:700, color:"#92400E",
-              fontSize:13, marginBottom:4 }}>
-              {alerts.length} programme{alerts.length>1?"s":""} require immediate attention
-            </div>
-            <div style={{ fontSize:12, color:"#78350F", lineHeight:1.6 }}>
-              {alerts.map(a=>{
-                const m=getMilestone(a);
-                return `${a.code}: ${m.label} — ${m.urgency==="overdue"?`${Math.abs(m.days)}d overdue`:`${m.days}d`}`;
-              }).join("  ·  ")}
-            </div>
-          </div>
-          <button onClick={()=>navigate("/notifications")}
-            style={{ ...BS, fontSize:11, padding:"6px 12px", flexShrink:0 }}>
-            View All →
-          </button>
-        </div>
-      )}
-
-      {/* ── Filter tabs ── */}
-      <div style={{ display:"flex", gap:7, marginBottom:18, flexWrap:"wrap" }}>
-        {["ALL","PENDING","APPROVED","RESOURCE","ACCREDITED","REACCREDIT"].map(s=>{
-          const cfg = STATUS_CONFIG[s];
-          const count = s==="ALL"
-            ? programmes.length
-            : programmes.filter(p=>p.status===s).length;
-          return (
-            <button key={s} onClick={()=>setFilter(s)} style={{
-              padding:"6px 14px", borderRadius:20, cursor:"pointer",
-              fontFamily:"'IBM Plex Mono',monospace",
-              fontSize:10, fontWeight:700, border:"1.5px solid",
-              borderColor: filter===s ? (cfg?.color||"#07162F") : "#E2E8F0",
-              background:  filter===s ? (cfg?.bg||"#07162F")    : "#fff",
-              color:       filter===s ? (cfg?.color||"#fff")    : "#6B7280",
-              transition:"all 0.12s",
-            }}>
-              {s==="ALL" ? `All (${count})` : `${cfg?.label} (${count})`}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Programme Cards ── */}
       {loading ? (
-        <div style={{ display:"grid",
-          gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:16 }}>
-          {[1,2,3,4].map(i=>(
-            <div key={i} style={{ height:200, background:"#fff",
-              borderRadius:10, border:"1px solid #E2E8F0",
-              animation:"pulse 1.5s infinite" }}/>
-          ))}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:16 }}>
+          {[1,2,3].map(i=><div key={i} style={{ height:180, background:"#fff", borderRadius:10, border:"1px solid #E2E8F0", animation:"pulse 1.5s infinite" }}/>)}
         </div>
-      ) : displayed.length === 0 ? (
-        <div style={{ textAlign:"center", padding:60,
-          color:"#94A3B8", fontFamily:"'IBM Plex Mono',monospace",
-          fontSize:12 }}>
-          No programmes match this filter.
+      ) : programmes.length===0 ? (
+        <div style={{ background:"#fff", borderRadius:12, border:"1px solid #E2E8F0", padding:"64px 20px", textAlign:"center" }}>
+          <div style={{ fontSize:40, marginBottom:12, opacity:0.15 }}>📋</div>
+          <div style={{ fontFamily:"monospace", color:"#94A3B8", fontSize:13, marginBottom:14 }}>No programmes yet.</div>
+          <button onClick={()=>navigate("/courses/new")} style={BP}>+ Create Programme</button>
         </div>
       ) : (
-        <div style={{ display:"grid",
-          gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",
-          gap:16 }}>
-          {displayed.map(p => {
-            const m = getMilestone(p);
-            const { ratio, pass } = getRatio(p.student_count, p.lecturer_count);
-            const readiness = getReadiness(p);
-            const urgent = m.urgency !== "normal";
-            return (
-              <div key={p.id}
-                onClick={()=>setSelected(p)}
-                style={{
-                  background:"#fff", border:"1px solid #E2E8F0",
-                  borderLeft:`4px solid ${urgent?uc(m.urgency):"#E2E8F0"}`,
-                  borderRadius:10, padding:"18px 20px", cursor:"pointer",
-                  boxShadow:"0 1px 4px rgba(7,22,47,0.06)",
-                  transition:"transform 0.18s,box-shadow 0.18s",
-                  animation:"fadeIn 0.25s ease",
-                }}
-                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(7,22,47,0.12)";}}
-                onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(7,22,47,0.06)";}}>
-
-                {/* Card header */}
-                <div style={{ display:"flex", justifyContent:"space-between",
-                  alignItems:"flex-start", marginBottom:10, gap:6 }}>
-                  <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:9, color:"#94A3B8",
-                      fontFamily:"'IBM Plex Mono',monospace",
-                      letterSpacing:"0.08em", textTransform:"uppercase",
-                      marginBottom:2 }}>
-                      {p.code} · {p.department}
+        <>
+          {pending.length>0 && (
+            <div style={{ marginBottom:24 }}>
+              <div style={LABEL}>Pending — Awaiting Submission ({pending.length})</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:16 }}>
+                {pending.map(p=>(
+                  <div key={p.id} style={{ background:"#fff", border:"1px solid #FCD34D", borderLeft:"4px solid #D97706", borderRadius:10, padding:"16px 18px", boxShadow:"0 1px 4px rgba(7,22,47,0.06)" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontSize:9, color:"#94A3B8", fontFamily:"monospace", textTransform:"uppercase", marginBottom:2 }}>{p.faculty} · {p.department}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#07162F" }}>{p.name}</div>
+                      </div>
+                      <Badge status={p.status}/>
                     </div>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#07162F",
-                      overflow:"hidden", textOverflow:"ellipsis",
-                      whiteSpace:"nowrap", maxWidth:200 }}>
-                      {p.name}
+                    <div style={{ fontSize:12, color:"#64748B", marginBottom:12 }}>👨‍🎓 {p.student_count||0} students · 👨‍🏫 {p.staff_count||0} staff</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={()=>navigate(`/courses/${p.id}`)} style={BS}>View →</button>
+                      <button onClick={()=>handleSubmit(p.id)} disabled={actionLoad[p.id]==="submit"}
+                        style={{ ...BP, opacity:actionLoad[p.id]?0.7:1 }}>
+                        {actionLoad[p.id]==="submit"?"Submitting…":"📤 Submit for Review"}
+                      </button>
                     </div>
                   </div>
-                  <Badge status={p.status}/>
-                </div>
-
-                {/* Milestone */}
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:9, color:"#94A3B8",
-                    fontFamily:"'IBM Plex Mono',monospace",
-                    textTransform:"uppercase", letterSpacing:"0.1em",
-                    marginBottom:3 }}>
-                    {m.label}
+                ))}
+              </div>
+            </div>
+          )}
+          {inReview.length>0 && (
+            <div>
+              <div style={LABEL}>In Review with APU ({inReview.length})</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:16 }}>
+                {inReview.map(p=>(
+                  <div key={p.id} style={{ background:"#fff", border:"1px solid #BFDBFE", borderLeft:"4px solid #2563EB", borderRadius:10, padding:"16px 18px", boxShadow:"0 1px 4px rgba(7,22,47,0.06)" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontSize:9, color:"#94A3B8", fontFamily:"monospace", textTransform:"uppercase", marginBottom:2 }}>{p.faculty} · {p.department}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#07162F" }}>{p.name}</div>
+                      </div>
+                      <Badge status={p.status}/>
+                    </div>
+                    <div style={{ fontSize:12, color:"#64748B", marginBottom:12 }}>👨‍🎓 {p.student_count||0} students · 👨‍🏫 {p.staff_count||0} staff</div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={()=>navigate(`/courses/${p.id}`)} style={BS}>View Details →</button>
+                      <button onClick={()=>navigate(`/documents?programme=${p.id}`)} style={{ ...BS, color:"#059669", borderColor:"#6EE7B7" }}>📁 Documents</button>
+                    </div>
                   </div>
-                  <span style={{ display:"inline-block",
-                    background:ubg(m.urgency), color:uc(m.urgency),
-                    padding:"2px 8px", borderRadius:3, fontSize:10,
-                    fontWeight:700, fontFamily:"'IBM Plex Mono',monospace",
-                    border:`1px solid ${uc(m.urgency)}33` }}>
-                    {fmt(m.date)} · {m.urgency==="overdue"
-                      ? `${Math.abs(m.days)}d OVERDUE`
-                      : `${m.days}d remaining`}
-                  </span>
-                </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
-                {/* Stats row */}
-                <div style={{ display:"flex", alignItems:"center",
-                  gap:8, marginBottom:9,
-                  fontSize:11, color:"#64748B", flexWrap:"wrap" }}>
-                  <span>👨‍🎓 {(p.student_count||0).toLocaleString()}</span>
-                  <span>👨‍🏫 {p.lecturer_count||0}</span>
-                  <span style={{ fontSize:10,
-                    fontFamily:"'IBM Plex Mono',monospace", fontWeight:700,
-                    padding:"1px 6px", borderRadius:3,
-                    background:pass?"#D1FAE5":"#FEE2E2",
-                    color:pass?"#065F46":"#991B1B",
-                    border:`1px solid ${pass?"#6EE7B7":"#FCA5A5"}` }}>
-                    {pass?"✓":"✗"} {ratio}
-                  </span>
-                </div>
+      <div style={{ marginTop:28, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14 }}>
+        <QuickLink icon="📁" label="Upload Documents"  sub="Add evidence to your programmes"    action={()=>navigate("/documents")}/>
+        <QuickLink icon="⊞"  label="Ratio Calculator"  sub="Check NUC staff:student compliance" action={()=>navigate("/calculator")}/>
+        <QuickLink icon="📋" label="NUC Standards"      sub="View minimum ratio requirements"    action={()=>navigate("/nuc-standards")}/>
+        <QuickLink icon="🔔" label="Notifications"      sub={`${unread} unread alert${unread!==1?"s":""}`} action={()=>navigate("/notifications")}/>
+      </div>
+      <ToastMsg toast={toast}/>
+    </div>
+  );
+}
 
-                <Bar value={readiness}/>
-                <div style={{ fontSize:9, color:"#94A3B8", marginTop:3,
-                  fontFamily:"'IBM Plex Mono',monospace",
-                  letterSpacing:"0.1em", textTransform:"uppercase" }}>
-                  Accreditation Readiness
-                </div>
+// ═══════════════════════════════════════════════════════════════════════════════
+// APU DASHBOARD — IN_REVIEW queue, forward to NUC, verify docs, waiting badge
+// ═══════════════════════════════════════════════════════════════════════════════
+function APUDashboard() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast, show } = useToast();
+  const [programmes, setProgrammes] = useState([]);
+  const [unread,     setUnread]     = useState(0);
+  const [loading,    setLoading]    = useState(true);
+  const [actionLoad, setActionLoad] = useState({});
 
-                {/* Quick action buttons */}
-                <div style={{ display:"flex", gap:6, marginTop:12 }}
-                  onClick={e=>e.stopPropagation()}>
-                  <button onClick={()=>navigate(`/courses/${p.id}`)}
-                    style={{ flex:1, padding:"6px", borderRadius:5,
-                      cursor:"pointer", fontSize:10, fontWeight:700,
-                      fontFamily:"'IBM Plex Mono',monospace",
-                      background:"#EFF6FF", color:"#1D4ED8",
-                      border:"1px solid #BFDBFE" }}>
-                    View Detail →
-                  </button>
-                  <button onClick={()=>navigate(`/documents?programme=${p.id}`)}
-                    style={{ padding:"6px 10px", borderRadius:5,
-                      cursor:"pointer", fontSize:10, fontWeight:700,
-                      fontFamily:"'IBM Plex Mono',monospace",
-                      background:"#F0FDF4", color:"#059669",
-                      border:"1px solid #6EE7B7" }}>
-                    📤 Docs
-                  </button>
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [rRes, nRes] = await Promise.all([
+        programmesAPI.list({ status:"IN_REVIEW" }),
+        notificationsAPI.list(),
+      ]);
+      setProgrammes(rRes.data||[]);
+      setUnread((nRes.data||[]).filter(n=>!n.is_read).length);
+    } catch(e){ console.error(e); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(()=>{ load(); },[load]);
+
+  const handleForward = async (id) => {
+    setActionLoad(p=>({...p,[id]:"forward"}));
+    try {
+      await programmesAPI.forward(id);
+      show("Programme forwarded to NUC.");
+      load();
+    } catch(e){ show(e.response?.data?.error||"Failed to forward.","error"); }
+    finally { setActionLoad(p=>({...p,[id]:null})); }
+  };
+
+  const total = programmes.length;
+
+  return (
+    <div style={PAGE}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}} @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}} @keyframes blink{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
+
+      <div style={{ marginBottom:28, display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div style={{ fontSize:10, color:"#94A3B8", fontFamily:"monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4 }}>Academic Planning Unit</div>
+          <h1 style={{ ...H1, display:"flex", alignItems:"center", gap:12 }}>
+            Review Dashboard
+            {total>0 && (
+              <span style={{ background:"#DC2626", color:"#fff", fontFamily:"monospace",
+                fontSize:13, fontWeight:700, padding:"2px 12px", borderRadius:9999,
+                animation:"blink 2s infinite" }}>
+                {total} waiting
+              </span>
+            )}
+          </h1>
+          <p style={SUB}>
+            Welcome back, {user?.first_name||"APU Officer"}.
+            {total>0 ? ` You have ${total} programme${total>1?"s":""} awaiting review.` : " Your review queue is currently empty."}
+          </p>
+        </div>
+        <button onClick={load} style={BS}>🔄 Refresh</button>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:28 }}>
+        <KPI label="In Review Queue"   value={total}  sub="Awaiting your review"     color="#2563EB" icon="⊟" loading={loading} accent="#2563EB"/>
+        <KPI label="Unread Alerts"     value={unread} sub="Notifications"             color="#DC2626" icon="🔔" loading={loading} accent="#DC2626" onClick={()=>navigate("/notifications")}/>
+        <KPI label="Verify Documents"  value="→"     sub="Review uploaded evidence"   color="#059669" icon="✅" loading={false}   accent="#059669" onClick={()=>navigate("/documents")}/>
+        <KPI label="NUC Standards"     value="→"     sub="View ratio requirements"    color="#7C3AED" icon="📋" loading={false}   accent="#7C3AED" onClick={()=>navigate("/nuc-standards")}/>
+      </div>
+
+      {!loading && total>0 && (
+        <div style={{ background:"linear-gradient(135deg,#EFF6FF,#DBEAFE)", border:"1px solid #BFDBFE",
+          borderRadius:10, padding:"16px 20px", marginBottom:24,
+          display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{ width:44, height:44, borderRadius:"50%", background:"#2563EB",
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>🏛</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:700, color:"#1D4ED8", fontSize:14 }}>{total} programme{total>1?"s":""} in your review queue</div>
+            <div style={{ fontSize:12, color:"#3B82F6", marginTop:2 }}>Review documents, verify them, then forward compliant programmes to NUC for final decision.</div>
+          </div>
+          <button onClick={()=>navigate("/documents")} style={{ ...BS, fontSize:11, flexShrink:0 }}>Verify Documents →</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))", gap:16 }}>
+          {[1,2,3].map(i=><div key={i} style={{ height:200, background:"#fff", borderRadius:10, border:"1px solid #E2E8F0", animation:"pulse 1.5s infinite" }}/>)}
+        </div>
+      ) : programmes.length===0 ? (
+        <div style={{ background:"#fff", borderRadius:12, border:"1px solid #E2E8F0", padding:"64px 20px", textAlign:"center" }}>
+          <div style={{ fontSize:40, marginBottom:12, opacity:0.15 }}>✅</div>
+          <div style={{ fontFamily:"monospace", color:"#94A3B8", fontSize:13 }}>Review queue is empty. No programmes awaiting APU review.</div>
+        </div>
+      ) : (
+        <>
+          <div style={LABEL}>Review Queue — IN_REVIEW ({total})</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))", gap:16 }}>
+            {programmes.map(p=>(
+              <div key={p.id} style={{ background:"#fff", border:"1px solid #BFDBFE", borderLeft:"4px solid #2563EB",
+                borderRadius:10, overflow:"hidden", boxShadow:"0 1px 4px rgba(7,22,47,0.06)", transition:"box-shadow 0.15s" }}
+                onMouseEnter={e=>e.currentTarget.style.boxShadow="0 6px 20px rgba(7,22,47,0.1)"}
+                onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(7,22,47,0.06)"}>
+                <div style={{ padding:"16px 18px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:9, color:"#94A3B8", fontFamily:"monospace", textTransform:"uppercase", marginBottom:2 }}>{p.faculty} · {p.department}</div>
+                      <div style={{ fontSize:14, fontWeight:700, color:"#07162F", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
+                    </div>
+                    <Badge status={p.status}/>
+                  </div>
+                  <div style={{ fontSize:12, color:"#64748B", marginBottom:10 }}>👨‍🎓 {(p.student_count||0).toLocaleString()} students · 👨‍🏫 {p.staff_count||0} staff</div>
+                  {p.student_count>0 && p.staff_count>0 && (
+                    <div style={{ padding:"7px 11px", background:"#F8FAFC", borderRadius:6,
+                      fontSize:11, fontFamily:"monospace", marginBottom:12 }}>
+                      Current ratio: <strong>1 : {(p.student_count/p.staff_count).toFixed(1)}</strong>
+                    </div>
+                  )}
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    <button onClick={()=>navigate(`/courses/${p.id}`)} style={BS}>Review →</button>
+                    <button onClick={()=>navigate(`/documents?programme=${p.id}`)}
+                      style={{ ...BS, color:"#059669", borderColor:"#6EE7B7", background:"#F0FDF4" }}>
+                      ✅ Verify Docs
+                    </button>
+                    <button onClick={()=>handleForward(p.id)} disabled={actionLoad[p.id]==="forward"}
+                      style={{ ...BPURP, opacity:actionLoad[p.id]?0.7:1 }}>
+                      {actionLoad[p.id]==="forward"?"Forwarding…":"🚀 Forward to NUC"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        </>
       )}
 
-      {/* ── Upcoming Milestones Table ── */}
-      {!loading && alerts.length > 0 && (
-        <div style={{ marginTop:32, background:"#fff",
-          borderRadius:10, border:"1px solid #E2E8F0",
-          boxShadow:"0 1px 4px rgba(7,22,47,0.06)" }}>
-          <div style={{ padding:"14px 20px",
-            borderBottom:"1px solid #E2E8F0",
-            display:"flex", justifyContent:"space-between",
-            alignItems:"center" }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"#07162F" }}>
-              Upcoming Milestones
-            </div>
-            <button onClick={()=>navigate("/courses")}
-              style={{ ...BS, fontSize:11, padding:"6px 12px" }}>
-              View All Courses →
-            </button>
-          </div>
-          <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
-              <thead>
-                <tr>
-                  {["Programme","Status","Milestone","Due Date","Days Left","Readiness",""].map(h=>(
-                    <th key={h} style={{ padding:"10px 14px", textAlign:"left",
-                      fontSize:9, color:"#94A3B8",
-                      fontFamily:"'IBM Plex Mono',monospace",
-                      letterSpacing:"0.1em", textTransform:"uppercase",
-                      fontWeight:700, borderBottom:"1px solid #E2E8F0",
-                      whiteSpace:"nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.map((p,i)=>{
-                  const m=getMilestone(p);
-                  return (
-                    <tr key={p.id}
-                      style={{ borderBottom:"1px solid #F1F5F9",
-                        background:i%2===0?"#fff":"#FAFBFC",
-                        cursor:"pointer", transition:"background 0.1s" }}
-                      onMouseEnter={e=>e.currentTarget.style.background="#EFF6FF"}
-                      onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#FAFBFC"}
-                      onClick={()=>setSelected(p)}>
-                      <td style={{ padding:"11px 14px" }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:"#07162F" }}>{p.name}</div>
-                        <div style={{ fontSize:10, color:"#94A3B8", fontFamily:"'IBM Plex Mono',monospace" }}>{p.code}</div>
-                      </td>
-                      <td style={{ padding:"11px 14px" }}><Badge status={p.status}/></td>
-                      <td style={{ padding:"11px 14px", fontSize:12, color:"#374151", fontWeight:600 }}>{m.label}</td>
-                      <td style={{ padding:"11px 14px", fontFamily:"'IBM Plex Mono',monospace", fontSize:11 }}>{fmt(m.date)}</td>
-                      <td style={{ padding:"11px 14px" }}>
-                        <span style={{ fontFamily:"'IBM Plex Mono',monospace",
-                          fontSize:12, fontWeight:700, color:uc(m.urgency) }}>
-                          {m.urgency==="overdue"?`${Math.abs(m.days)}d OVERDUE`:`${m.days}d`}
-                        </span>
-                      </td>
-                      <td style={{ padding:"11px 14px", minWidth:120 }}>
-                        <Bar value={getReadiness(p)}/>
-                      </td>
-                      <td style={{ padding:"11px 14px" }}>
-                        <button onClick={e=>{e.stopPropagation();navigate(`/courses/${p.id}`);}}
-                          style={{ padding:"4px 10px", borderRadius:5,
-                            background:"#EFF6FF", border:"1px solid #BFDBFE",
-                            color:"#1D4ED8", fontFamily:"'IBM Plex Mono',monospace",
-                            fontSize:10, fontWeight:700, cursor:"pointer" }}>
-                          Open →
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      <div style={{ marginTop:28, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14 }}>
+        <QuickLink icon="✅" label="Verify Documents"  sub="Review and verify uploaded evidence"  action={()=>navigate("/documents")}/>
+        <QuickLink icon="⊞"  label="Ratio Calculator"  sub="Check NUC staff:student compliance"  action={()=>navigate("/calculator")}/>
+        <QuickLink icon="📋" label="NUC Standards"      sub="View all minimum ratio requirements" action={()=>navigate("/nuc-standards")}/>
+        <QuickLink icon="🔔" label="Notifications"      sub={`${unread} unread alert${unread!==1?"s":""}`} action={()=>navigate("/notifications")}/>
+      </div>
+      <ToastMsg toast={toast}/>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NUC VISITOR DASHBOARD — FORWARDED_TO_NUC, Accredit + Deny decisions
+// ═══════════════════════════════════════════════════════════════════════════════
+function NUCDashboard() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast, show } = useToast();
+  const [programmes, setProgrammes] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [actionLoad, setActionLoad] = useState({});
+  const [denyTarget, setDenyTarget] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await programmesAPI.list({ status:"FORWARDED_TO_NUC" });
+      setProgrammes(res.data||[]);
+    } catch(e){ console.error(e); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(()=>{ load(); },[load]);
+
+  const handleDecision = async (id, decision, comments="") => {
+    setActionLoad(p=>({...p,[id]:decision}));
+    try {
+      await programmesAPI.decision(id, { decision, comments });
+      show(`Programme ${decision==="ACCREDITED"?"accredited":"denied"}.`);
+      setDenyTarget(null);
+      load();
+    } catch(e){ show(e.response?.data?.error||"Decision failed.","error"); }
+    finally { setActionLoad(p=>({...p,[id]:null})); }
+  };
+
+  const total = programmes.length;
+
+  return (
+    <div style={PAGE}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}} @keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}`}</style>
+
+      <div style={{ marginBottom:28, display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div style={{ fontSize:10, color:"#94A3B8", fontFamily:"monospace", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:4 }}>NUC Visiting Team</div>
+          <h1 style={H1}>Accreditation Decision Panel</h1>
+          <p style={SUB}>Welcome, {user?.first_name||"NUC Officer"}. {total>0 ? `${total} programme${total>1?"s":""} await your final decision.` : "No programmes awaiting decision."}</p>
         </div>
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={load} style={BS}>🔄 Refresh</button>
+          <button onClick={()=>navigate("/nuc-standards")} style={BS}>📋 NUC Standards</button>
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:16, marginBottom:28 }}>
+        <KPI label="Awaiting Decision"  value={total} sub="Forwarded to NUC"       color="#7C3AED" icon="🏛" loading={loading} accent="#7C3AED"/>
+        <KPI label="Ratio Calculator"   value="→"    sub="Check compliance"         color="#2563EB" icon="⊞" loading={false}   accent="#2563EB" onClick={()=>navigate("/calculator")}/>
+        <KPI label="NUC Standards"      value="→"    sub="View ratio requirements"  color="#059669" icon="📋" loading={false}   accent="#059669" onClick={()=>navigate("/nuc-standards")}/>
+      </div>
+
+      <div style={{ background:"linear-gradient(135deg,#EDE9FE,#DDD6FE)", border:"1px solid #C4B5FD",
+        borderRadius:10, padding:"14px 20px", marginBottom:24,
+        display:"flex", alignItems:"center", gap:12 }}>
+        <span style={{ fontSize:20 }}>🔍</span>
+        <div>
+          <div style={{ fontWeight:700, color:"#5B21B6", fontSize:13 }}>NUC Visitor — Final Decision Authority</div>
+          <div style={{ fontSize:12, color:"#7C3AED", marginTop:2 }}>You have read-only access to all programme documents. Use the Accredit or Deny buttons below to submit your final decision.</div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))", gap:16 }}>
+          {[1,2,3].map(i=><div key={i} style={{ height:220, background:"#fff", borderRadius:10, border:"1px solid #E2E8F0", animation:"pulse 1.5s infinite" }}/>)}
+        </div>
+      ) : programmes.length===0 ? (
+        <div style={{ background:"#fff", borderRadius:12, border:"1px solid #E2E8F0", padding:"64px 20px", textAlign:"center" }}>
+          <div style={{ fontSize:40, marginBottom:12, opacity:0.15 }}>🏛</div>
+          <div style={{ fontFamily:"monospace", color:"#94A3B8", fontSize:13 }}>No programmes have been forwarded to NUC yet.</div>
+        </div>
+      ) : (
+        <>
+          <div style={LABEL}>Awaiting Final NUC Decision ({total})</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))", gap:16 }}>
+            {programmes.map(p=>(
+              <div key={p.id} style={{ background:"#fff", border:"1px solid #C4B5FD",
+                borderLeft:"4px solid #7C3AED", borderRadius:10, overflow:"hidden",
+                boxShadow:"0 1px 4px rgba(7,22,47,0.06)", transition:"box-shadow 0.15s" }}
+                onMouseEnter={e=>e.currentTarget.style.boxShadow="0 6px 20px rgba(7,22,47,0.1)"}
+                onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 4px rgba(7,22,47,0.06)"}>
+                <div style={{ background:"linear-gradient(135deg,#07162F,#0C2D5E)", padding:"14px 18px" }}>
+                  <div style={{ fontSize:9, color:"#94A3B8", fontFamily:"monospace", textTransform:"uppercase", marginBottom:3 }}>{p.faculty} · {p.department}</div>
+                  <div style={{ fontSize:15, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
+                  <div style={{ marginTop:8 }}><Badge status={p.status}/></div>
+                </div>
+                <div style={{ padding:"16px 18px" }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+                    {[
+                      { l:"Students",  v:(p.student_count||0).toLocaleString() },
+                      { l:"Staff",     v:p.staff_count||0 },
+                      { l:"Faculty",   v:p.faculty||"—" },
+                      { l:"Ratio",     v:p.student_count&&p.staff_count?`1 : ${(p.student_count/p.staff_count).toFixed(1)}`:"—" },
+                    ].map((s,i)=>(
+                      <div key={i} style={{ background:"#F8FAFC", border:"1px solid #E2E8F0", borderRadius:6, padding:"8px 11px" }}>
+                        <div style={{ fontSize:8, color:"#94A3B8", fontFamily:"monospace", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:3 }}>{s.l}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#07162F", fontFamily:"monospace" }}>{s.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                    <button onClick={()=>navigate(`/courses/${p.id}`)} style={BS}>View Documents →</button>
+                    <button onClick={()=>handleDecision(p.id,"ACCREDITED")} disabled={actionLoad[p.id]==="ACCREDITED"}
+                      style={{ ...BGREEN, flex:1, opacity:actionLoad[p.id]?0.7:1 }}>
+                      {actionLoad[p.id]==="ACCREDITED"?"Processing…":"✓ Accredit"}
+                    </button>
+                    <button onClick={()=>setDenyTarget(p)} disabled={!!actionLoad[p.id]}
+                      style={{ ...BRED, flex:1, opacity:actionLoad[p.id]?0.5:1 }}>
+                      ✕ Deny
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
-      {/* Modal */}
-      <ProgrammeModal
-        programme={selected}
-        onClose={()=>setSelected(null)}
-        onNavigate={navigate}
+      <div style={{ marginTop:28, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14 }}>
+        <QuickLink icon="⊞"  label="Ratio Calculator" sub="Verify staff:student ratios"    action={()=>navigate("/calculator")}/>
+        <QuickLink icon="📋" label="NUC Standards"     sub="View all ratio requirements"    action={()=>navigate("/nuc-standards")}/>
+        <QuickLink icon="👥" label="Team Portal"       sub="View accreditation team"        action={()=>navigate("/team")}/>
+      </div>
+
+      <DenyModal
+        programme={denyTarget}
+        onClose={()=>setDenyTarget(null)}
+        loading={denyTarget && actionLoad[denyTarget.id]==="DENIED"}
+        onConfirm={(comment)=>handleDecision(denyTarget.id,"DENIED",comment)}
       />
+      <ToastMsg toast={toast}/>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT EXPORT — routes to correct dashboard, never shows AccessDenied
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function Dashboard() {
+  const { isHOD, isAPU, isNUC } = useRole();
+  if (isHOD) return <HODDashboard />;
+  if (isAPU) return <APUDashboard />;
+  if (isNUC) return <NUCDashboard />;
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
+      minHeight:"60vh", fontFamily:"monospace", color:"#94A3B8", fontSize:13 }}>
+      Loading dashboard…
     </div>
   );
 }
