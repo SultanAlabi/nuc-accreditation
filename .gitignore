@@ -49,8 +49,10 @@ live_report_1.pdf
 
 # Postman folder (not needed in repo)
 postman/
+.postman/
 
-# Editors
+# IDE/Editor folders
+.qodo/
 .vscode/
 .idea/
 *.suo
