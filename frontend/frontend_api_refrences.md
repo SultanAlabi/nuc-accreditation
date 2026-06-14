@@ -535,7 +535,8 @@ formData.append('programme', programmeId)
 formData.append('file', fileInput)
 
 await api.post(`/api/programmes/${id}/documents/`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    // Do not set Content-Type manually. Let the browser/axios set the correct
+    // Content-Type (including the multipart boundary) automatically.
 })
 ```
 

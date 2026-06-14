@@ -147,11 +147,10 @@ class ForgotPasswordView(APIView):
             fail_silently=False,
         )
 
-        response_data = {"message": "Verification code sent to your email."}
-        if settings.DEBUG:
-            response_data["debug_code"] = code
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(
+    {"message": "Verification code sent to your email."},
+    status=status.HTTP_200_OK
+)
 
 
 class ResetPasswordView(APIView):

@@ -1,0 +1,856 @@
+diff --git a/.gitignore b/.gitignore
+index e84da75..dc338b9 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -21,6 +21,8 @@ pip-delete-this-directory.txt
+ 
+ # Environment
+ .env
++*.env
++!.env.example
+ backend/.env
+ 
+ # Node
+@@ -34,6 +36,20 @@ frontend/dist/
+ npm-debug.log*
+ yarn-debug.log*
+ 
++# Generated PDFs, temp reports/logs, media outputs, and test artifacts
++backend/tmp_*.txt
++backend/tmp_*.pdf
++backend/tmp_upload_test.py
++backend/media/
++frontend/tmp_report.pdf
++frontend/test-doc.docx
++report_json_api_auth_1.txt
++test_report.pdf
++live_report_1.pdf
++
++# Postman credential-containing request
++postman/collections/New Collection/New Request-2.request.yaml
++
+ # Editors
+ .vscode/
+ .idea/
+@@ -43,3 +59,4 @@ yarn-debug.log*
+ *.sln
+ *.sw?
+ .DS_Store
++
+diff --git a/.vscode/settings.json b/.vscode/settings.json
+deleted file mode 100644
+index 1b3ca5c..0000000
+--- a/.vscode/settings.json
++++ /dev/null
+@@ -1,7 +0,0 @@
+-{
+-    "cSpell.words": [
+-        "pycache",
+-        "qodo",
+-        "venv"
+-    ]
+-}
+\ No newline at end of file
+diff --git a/backend/.env b/backend/.env
+index c086c6a..3d499ad 100644
+--- a/backend/.env
++++ b/backend/.env
+@@ -1,7 +1,9 @@
+-SECRET_KEY='django-insecure-jodl9g1660&(mddx!zpd60p2@jb^l1w=qft@q$o(&&9w*4#06m'
++SECRET_KEY=1&*o41w$tgcry*sg21l4$o3hvib0%+to=xyu$vk(6mw)r_zat
+ DEBUG=True
+ DB_NAME=nuc_accreditation
+ DB_USER=nuc_user
+-DB_PASSWORD=NewStrongPassword2025
++DB_PASSWORD=gbollyboy04
+ DB_HOST=localhost
+-DB_PORT=5432
+\ No newline at end of file
++DB_PORT=5432
++EMAIL_HOST_USER=accreditmsnoreply@gmail.com
++EMAIL_HOST_PASSWORD=cles dzip vexe opnx
+diff --git a/backend/accounts/views.py b/backend/accounts/views.py
+index 035135a..7baed50 100644
+--- a/backend/accounts/views.py
++++ b/backend/accounts/views.py
+@@ -147,11 +147,10 @@ class ForgotPasswordView(APIView):
+             fail_silently=False,
+         )
+ 
+-        response_data = {"message": "Verification code sent to your email."}
+-        if settings.DEBUG:
+-            response_data["debug_code"] = code
+-
+-        return Response(response_data, status=status.HTTP_200_OK)
++        return Response(
++    {"message": "Verification code sent to your email."},
++    status=status.HTTP_200_OK
++)
+ 
+ 
+ class ResetPasswordView(APIView):
+diff --git a/backend/config/asgi.py b/backend/config/asgi.py
+index ffbb5f5..9a0938c 100644
+--- a/backend/config/asgi.py
++++ b/backend/config/asgi.py
+@@ -10,7 +10,22 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
+ import os
+ 
+ from django.core.asgi import get_asgi_application
++from channels.routing import ProtocolTypeRouter, URLRouter
++from channels.auth import AuthMiddlewareStack
++from config.jwt_middleware import JwtAuthMiddlewareStack
++import notifications.routing
+ 
+ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+ 
+-application = get_asgi_application()
++django_asgi_app = get_asgi_application()
++
++application = ProtocolTypeRouter({
++	"http": django_asgi_app,
++	"websocket": AuthMiddlewareStack(
++		JwtAuthMiddlewareStack(
++			URLRouter(
++				notifications.routing.websocket_urlpatterns
++			)
++		)
++	),
++})
+diff --git a/backend/config/settings.py b/backend/config/settings.py
+index efcea7d..9b91fe3 100644
+--- a/backend/config/settings.py
++++ b/backend/config/settings.py
+@@ -44,12 +44,15 @@ INSTALLED_APPS = [
+     'django.contrib.staticfiles',
+     'rest_framework',
+     'corsheaders',
++    'channels',
+     'accounts',
+     'programmes',
+     'documents',
+     'notifications',
+     'dashboard',
+     'team',
++    'django_filters',
++    'audit',
+ ]
+ 
+ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+@@ -61,6 +64,7 @@ MIDDLEWARE = [
+     'django.middleware.common.CommonMiddleware',
+     'django.middleware.csrf.CsrfViewMiddleware',
+     'django.contrib.auth.middleware.AuthenticationMiddleware',
++    'audit.middleware.AuditMiddleware',
+     'django.contrib.messages.middleware.MessageMiddleware',
+     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+ ]
+@@ -150,19 +154,34 @@ REST_FRAMEWORK = {
+     'DEFAULT_AUTHENTICATION_CLASSES': (
+         'rest_framework_simplejwt.authentication.JWTAuthentication',
+     ),
++    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
++    
+ }
+ 
+ import os
+ MEDIA_URL = '/media/'
+ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+ 
++# Channels configuration (in-memory layer suitable for development)
++ASGI_APPLICATION = 'config.asgi.application'
++CHANNEL_LAYERS = {
++    'default': {
++        'BACKEND': 'channels.layers.InMemoryChannelLayer'
++    }
++}
++
+ CORS_ALLOWED_ORIGINS = [
+     "http://localhost:5173",
+     "http://127.0.0.1:5173",
+ ]
+ 
+ # Email Settings
+-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+-DEFAULT_FROM_EMAIL = 'no-reply@nuc-accreditation.edu.ng'
+ 
+ 
++EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
++EMAIL_HOST = 'smtp.gmail.com'
++EMAIL_PORT = 587
++EMAIL_USE_TLS = True
++EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
++EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
++DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER')
+\ No newline at end of file
+diff --git a/backend/documents/apps.py b/backend/documents/apps.py
+index 93ca755..d6e28a5 100644
+--- a/backend/documents/apps.py
++++ b/backend/documents/apps.py
+@@ -3,3 +3,9 @@ from django.apps import AppConfig
+ 
+ class DocumentsConfig(AppConfig):
+     name = 'documents'
++
++    def ready(self):
++        try:
++            import documents.signals  # noqa: F401
++        except Exception:
++            pass
+diff --git a/backend/documents/serializers.py b/backend/documents/serializers.py
+index 8a575fb..a6bba2d 100644
+--- a/backend/documents/serializers.py
++++ b/backend/documents/serializers.py
+@@ -1,8 +1,54 @@
+ from rest_framework import serializers
+ from .models import Document
+ 
++
+ class DocumentSerializer(serializers.ModelSerializer):
++    # frontend sends `file_name` — map it to the model's `title` field
++    file_name = serializers.CharField(source='title', write_only=True, required=False)
++    # Accept arbitrary frontend keys for category and map them in
++    # `validate_category`. This prevents the autogenerated ChoiceField from
++    # rejecting frontend keys before our mapping runs.
++    category = serializers.CharField(required=False)
++
++    # Map frontend category keys (used in the React app) to the model's
++    # Category values. Unknown keys fall back to OTHER so uploads don't fail
++    # validation when the frontend uses a richer set of categories.
++    CATEGORY_MAP = {
++        'marking_schemes': 'OTHER',
++        'lesson_notes': 'CURRICULUM',
++        'ca_records': 'OTHER',
++        'examiner_reports': 'OTHER',
++        'staff_files': 'STAFF_LIST',
++        'student_files': 'OTHER',
++        'qa_reports': 'OTHER',
++        'research_evidence': 'OTHER',
++        'question_papers': 'OTHER',
++        'other': 'OTHER',
++    }
++
+     class Meta:
+         model = Document
+         fields = '__all__'
+-        read_only_fields = ['uploaded_by', 'uploaded_at']
+\ No newline at end of file
++        read_only_fields = ['uploaded_by', 'uploaded_at']
++        extra_kwargs = {
++            'title': {'required': False},
++            'programme': {'required': False},
++        }
++
++    def validate_category(self, value):
++        """
++        Accept either the model's canonical choice value (e.g. 'STAFF_LIST') or
++        the frontend key (e.g. 'staff_files'). Map frontend keys to the model
++        values. Unknown keys default to 'OTHER'.
++        """
++        # If frontend accidentally sends the model value already, accept it
++        model_values = {v for v, _ in Document.Category.choices}
++        if value in model_values:
++            return value
++
++        mapped = self.CATEGORY_MAP.get(value)
++        if mapped:
++            return mapped
++
++        # Fallback
++        return Document.Category.OTHER
+\ No newline at end of file
+diff --git a/backend/documents/views.py b/backend/documents/views.py
+index acb8071..4eeb88b 100644
+--- a/backend/documents/views.py
++++ b/backend/documents/views.py
+@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, filters
+ from accounts.permissions import IsHOD, IsAPU, IsAnyRole
+ from .models import Document
+ from .serializers import DocumentSerializer
++from rest_framework.parsers import MultiPartParser, FormParser
+ 
+ 
+ class GlobalDocumentListView(generics.ListAPIView):
+@@ -48,6 +49,8 @@ class GlobalDocumentListView(generics.ListAPIView):
+ 
+ class DocumentListCreateView(generics.ListCreateAPIView):
+     serializer_class = DocumentSerializer
++    # Accept multipart form data (file uploads)
++    parser_classes = [MultiPartParser, FormParser]
+ 
+     def get_permissions(self):
+         if self.request.method == 'POST':
+diff --git a/backend/notifications/tests.py b/backend/notifications/tests.py
+deleted file mode 100644
+index 7ce503c..0000000
+--- a/backend/notifications/tests.py
++++ /dev/null
+@@ -1,3 +0,0 @@
+-from django.test import TestCase
+-
+-# Create your tests here.
+diff --git a/backend/notifications/views.py b/backend/notifications/views.py
+index 77beb77..35900df 100644
+--- a/backend/notifications/views.py
++++ b/backend/notifications/views.py
+@@ -28,10 +28,12 @@ class NotificationListView(generics.ListAPIView):
+ 
+ 
+ class MarkReadView(generics.UpdateAPIView):
+-    queryset = Notification.objects.all()
+     serializer_class = NotificationSerializer
+     permission_classes = [IsAnyRole]
+ 
++    def get_queryset(self):
++        return Notification.objects.filter(user=self.request.user)
++
+     def perform_update(self, serializer):
+         serializer.save(is_read=True)
+ 
+diff --git a/backend/programmes/__pycache__/__init__.cpython-313.pyc b/backend/programmes/__pycache__/__init__.cpython-313.pyc
+deleted file mode 100644
+index 6fde205..0000000
+Binary files a/backend/programmes/__pycache__/__init__.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/admin.cpython-313.pyc b/backend/programmes/__pycache__/admin.cpython-313.pyc
+deleted file mode 100644
+index ff106bd..0000000
+Binary files a/backend/programmes/__pycache__/admin.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/apps.cpython-313.pyc b/backend/programmes/__pycache__/apps.cpython-313.pyc
+deleted file mode 100644
+index 0d63601..0000000
+Binary files a/backend/programmes/__pycache__/apps.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/models.cpython-313.pyc b/backend/programmes/__pycache__/models.cpython-313.pyc
+deleted file mode 100644
+index 2d2605d..0000000
+Binary files a/backend/programmes/__pycache__/models.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/serializers.cpython-313.pyc b/backend/programmes/__pycache__/serializers.cpython-313.pyc
+deleted file mode 100644
+index 3c5ee9d..0000000
+Binary files a/backend/programmes/__pycache__/serializers.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/services.cpython-313.pyc b/backend/programmes/__pycache__/services.cpython-313.pyc
+deleted file mode 100644
+index ac2cc47..0000000
+Binary files a/backend/programmes/__pycache__/services.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/urls.cpython-313.pyc b/backend/programmes/__pycache__/urls.cpython-313.pyc
+deleted file mode 100644
+index 3ff030a..0000000
+Binary files a/backend/programmes/__pycache__/urls.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/__pycache__/views.cpython-313.pyc b/backend/programmes/__pycache__/views.cpython-313.pyc
+deleted file mode 100644
+index 20e173c..0000000
+Binary files a/backend/programmes/__pycache__/views.cpython-313.pyc and /dev/null differ
+diff --git a/backend/programmes/admin.py b/backend/programmes/admin.py
+index b86eab9..19bf0df 100644
+--- a/backend/programmes/admin.py
++++ b/backend/programmes/admin.py
+@@ -1,5 +1,6 @@
+ from django.contrib import admin
+-from .models import Programme, Milestone
++from .models import Programme, Milestone, ProgrammeReportAudit
+ 
+ admin.site.register(Programme)
+-admin.site.register(Milestone)
+\ No newline at end of file
++admin.site.register(Milestone)
++admin.site.register(ProgrammeReportAudit)
+\ No newline at end of file
+diff --git a/backend/programmes/apps.py b/backend/programmes/apps.py
+index b87f349..229a695 100644
+--- a/backend/programmes/apps.py
++++ b/backend/programmes/apps.py
+@@ -3,3 +3,10 @@ from django.apps import AppConfig
+ 
+ class ProgrammesConfig(AppConfig):
+     name = 'programmes'
++
++    def ready(self):
++        # import signal handlers
++        try:
++            import programmes.signals  # noqa: F401
++        except Exception:
++            pass
+diff --git a/backend/programmes/models.py b/backend/programmes/models.py
+index 5b50bfe..59a17ec 100644
+--- a/backend/programmes/models.py
++++ b/backend/programmes/models.py
+@@ -1,5 +1,6 @@
+ from django.db import models
+ from accounts.models import User
++from django.db.models import JSONField
+ 
+ class Programme(models.Model):
+     class Status(models.TextChoices):
+@@ -36,4 +37,24 @@ class Milestone(models.Model):
+     created_at = models.DateTimeField(auto_now_add=True)
+ 
+     def __str__(self):
+-        return f"{self.programme.name} - {self.title}"
+\ No newline at end of file
++        return f"{self.programme.name} - {self.title}"
++
++
++class ProgrammeReportAudit(models.Model):
++    class Action(models.TextChoices):
++        DOWNLOAD = 'DOWNLOAD', 'Download'
++        VIEW = 'VIEW', 'View'
++
++    programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='report_audits')
++    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
++    action = models.CharField(max_length=20, choices=Action.choices)
++    ip_address = models.CharField(max_length=100, blank=True)
++    user_agent = models.TextField(blank=True)
++    timestamp = models.DateTimeField(auto_now_add=True)
++    extra_data = JSONField(null=True, blank=True)
++
++    class Meta:
++        ordering = ['-timestamp']
++
++    def __str__(self):
++        return f"{self.programme.name} - {self.action} @ {self.timestamp}"
+\ No newline at end of file
+diff --git a/backend/programmes/tests.py b/backend/programmes/tests.py
+deleted file mode 100644
+index 7ce503c..0000000
+--- a/backend/programmes/tests.py
++++ /dev/null
+@@ -1,3 +0,0 @@
+-from django.test import TestCase
+-
+-# Create your tests here.
+diff --git a/backend/programmes/urls.py b/backend/programmes/urls.py
+index cae4b05..b4bb9cd 100644
+--- a/backend/programmes/urls.py
++++ b/backend/programmes/urls.py
+@@ -9,12 +9,14 @@ from .views import (
+     ProgrammeRatioView,
+     SubmitProgrammeView,
+     ForwardToNUCView,
+-    NUCDecisionView
++    NUCDecisionView,
++    ProgrammeReportView,
+ )
+ 
+ urlpatterns = [
+     path('', ProgrammeListCreateView.as_view(), name='programme-list'),
+     path('<int:pk>/', ProgrammeDetailView.as_view(), name='programme-detail'),
++    path('<int:pk>/report/', ProgrammeReportView.as_view(), name='programme-report'),
+     path('<int:pk>/milestones/', MilestoneListCreateView.as_view(), name='milestone-list'),
+     path('milestones/<int:pk>/', MilestoneDetailView.as_view(), name='milestone-detail'),
+     path('calculator/', RatioCalculatorView.as_view(), name='ratio-calculator'),
+diff --git a/backend/programmes/views.py b/backend/programmes/views.py
+index 764f6d3..9d10dcc 100644
+--- a/backend/programmes/views.py
++++ b/backend/programmes/views.py
+@@ -1,16 +1,29 @@
+-from rest_framework import generics, permissions, status
+-from rest_framework.views import APIView
++import logging
++import re
++from urllib.parse import quote
++
++from django.http import HttpResponse
++from django_filters.rest_framework import DjangoFilterBackend
++from rest_framework import generics, status
+ from rest_framework.response import Response
++from rest_framework.views import APIView
++
+ from accounts.models import User
+ from accounts.permissions import IsHOD, IsAPU, IsNUCVisitor, IsHODOrAPU, IsAnyRole
+ from notifications.models import Notification
+-from .models import Programme, Milestone
++
++from .models import Programme, Milestone, ProgrammeReportAudit
++from .pdf_generator import generate_pdf_report
++from .report_service import generate_readiness_report
+ from .serializers import ProgrammeSerializer, MilestoneSerializer
+ from .services import check_ratio, NUC_STANDARDS
+ 
++logger = logging.getLogger(__name__)
+ 
+ class ProgrammeListCreateView(generics.ListCreateAPIView):
+     serializer_class = ProgrammeSerializer
++    filter_backends = [DjangoFilterBackend]
++    filterset_fields = ['status', 'faculty', 'department']
+ 
+     def get_permissions(self):
+         if self.request.method == 'POST':
+@@ -119,6 +132,7 @@ class ProgrammeRatioView(APIView):
+     permission_classes = [IsAnyRole]
+ 
+     def get(self, request, pk):
++        # (debug logging moved to ProgrammeReportView.get)
+         try:
+             programme = Programme.objects.get(pk=pk)
+         except Programme.DoesNotExist:
+@@ -219,7 +233,6 @@ class ForwardToNUCView(APIView):
+             "status": "FORWARDED_TO_NUC"
+         })
+ 
+-
+ class NUCDecisionView(APIView):
+     """NUC Visitor makes final accreditation decision"""
+     permission_classes = [IsNUCVisitor]
+@@ -272,4 +285,81 @@ class NUCDecisionView(APIView):
+             "message": f"Programme {decision}.",
+             "status": decision,
+             "comments": comments
+-        })
+\ No newline at end of file
++        })
++ 
++class ProgrammeReportView(APIView):
++    """Generate accreditation readiness report for a programme"""
++    permission_classes = [IsAnyRole]
++    # Prevent DRF from interpreting the `format` query param (e.g. ?format=pdf)
++    # as a renderer selection which raises Http404 when no renderer exists.
++    format_kwarg = None
++
++    def perform_content_negotiation(self, request, force=False):
++        # Bypass DRF renderer/content negotiation only for PDF responses.
++        # JSON responses still need DRF to set accepted_renderer.
++        if request.query_params.get('format', '').lower() == 'pdf':
++            return (None, None)
++        return super().perform_content_negotiation(request, force)
++
++    def get(self, request, pk):
++        programme = self._get_programme_or_404(pk)
++        if programme is None:
++            return programme
++
++        report_data = generate_readiness_report(programme)
++        fmt = request.query_params.get('format', 'json').lower()
++
++        if fmt == 'pdf':
++            return self._pdf_response(programme, report_data)
++
++        self._create_report_audit(programme, ProgrammeReportAudit.Action.VIEW, request)
++        return Response(report_data, status=status.HTTP_200_OK)
++
++    def _get_programme_or_404(self, pk):
++        try:
++            return Programme.objects.get(pk=pk)
++        except Programme.DoesNotExist:
++            return Response(
++                {"error": "Programme not found."},
++                status=status.HTTP_404_NOT_FOUND
++            )
++
++    def _pdf_response(self, programme, report_data):
++        buffer = generate_pdf_report(report_data)
++        self._create_report_audit(programme, ProgrammeReportAudit.Action.DOWNLOAD, self.request)
++        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
++        filename = self._report_filename(programme)
++        response['Content-Disposition'] = self._content_disposition(filename)
++        return response
++
++    def _create_report_audit(self, programme, action, request=None):
++        try:
++            ProgrammeReportAudit.objects.create(
++                programme=programme,
++                user=self._authenticated_user(request),
++                action=action,
++                ip_address=getattr(request, 'META', {}).get('REMOTE_ADDR', '') if request is not None else '',
++                user_agent=getattr(request, 'META', {}).get('HTTP_USER_AGENT', '') if request is not None else '',
++            )
++        except Exception:
++            logger.exception('Failed to create programme report audit')
++
++    def _authenticated_user(self, request):
++        if request is None:
++            return None
++        user = getattr(request, 'user', None)
++        if user and getattr(user, 'is_authenticated', False):
++            return user
++        return None
++
++    def _report_filename(self, programme):
++        safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', programme.name.strip())
++        if safe_name.lower().endswith('.pdf'):
++            safe_name = safe_name[:-4]
++        safe_name = re.sub(r'_+', '_', safe_name).strip('._-') or 'accreditation_report'
++        return f"accreditation_report_{safe_name}.pdf"
++
++    def _content_disposition(self, filename):
++        quoted_filename = quote(filename)
++        return f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quoted_filename}'
++
+diff --git a/backend/requirements/base.txt b/backend/requirements/base.txt
+index e3f9bf5..f689298 100644
+Binary files a/backend/requirements/base.txt and b/backend/requirements/base.txt differ
+diff --git a/frontend/.gitignore b/frontend/.gitignore
+index a547bf3..38b3075 100644
+--- a/frontend/.gitignore
++++ b/frontend/.gitignore
+@@ -12,6 +12,10 @@ dist
+ dist-ssr
+ *.local
+ 
++# Generated/test artifacts
++tmp_report.pdf
++test-doc.docx
++
+ # Editor directories and files
+ .vscode/*
+ !.vscode/extensions.json
+diff --git a/frontend/frontend_api_refrences.md b/frontend/frontend_api_refrences.md
+index a512864..4973b8c 100644
+--- a/frontend/frontend_api_refrences.md
++++ b/frontend/frontend_api_refrences.md
+@@ -535,7 +535,8 @@ formData.append('programme', programmeId)
+ formData.append('file', fileInput)
+ 
+ await api.post(`/api/programmes/${id}/documents/`, formData, {
+-    headers: { 'Content-Type': 'multipart/form-data' }
++    // Do not set Content-Type manually. Let the browser/axios set the correct
++    // Content-Type (including the multipart boundary) automatically.
+ })
+ ```
+ 
+diff --git a/frontend/src/context/AuthContext.jsx b/frontend/src/context/AuthContext.jsx
+index e2b8d34..228330d 100644
+--- a/frontend/src/context/AuthContext.jsx
++++ b/frontend/src/context/AuthContext.jsx
+@@ -10,7 +10,7 @@ async function apiFetch(endpoint, options = {}) {
+     ...options,
+     headers: {
+       "Content-Type": "application/json",
+-      ...(token ? { Authorization: `Token ${token}` } : {}),
++      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+       ...(options.headers || {}),
+     },
+   });
+@@ -18,6 +18,7 @@ async function apiFetch(endpoint, options = {}) {
+   try { data = await res.json(); } catch { data = {}; }
+   if (!res.ok) {
+     const message =
++      data.error ||
+       data.non_field_errors?.[0] ||
+       data.detail ||
+       data.email?.[0] ||
+@@ -104,4 +105,4 @@ export function useAuth() {
+   const ctx = useContext(AuthContext);
+   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+   return ctx;
+-}
+\ No newline at end of file
++}
+diff --git a/frontend/src/pages/CourseDetail.jsx b/frontend/src/pages/CourseDetail.jsx
+index e319ada..a16ecb9 100644
+--- a/frontend/src/pages/CourseDetail.jsx
++++ b/frontend/src/pages/CourseDetail.jsx
+@@ -214,6 +214,8 @@ function UploadModal({ programmeId, onClose, onSuccess }) {
+         </div>
+       </div>
+     </div>
++
++    
+   );
+ }
+ 
+@@ -231,6 +233,36 @@ export default function CourseDetail() {
+   const [showUpload, setShowUpload] = useState(false);
+   const [toast,     setToast]     = useState(location.state?.toast || "");
+   const [docFilter, setDocFilter] = useState("all");
++  const [downloading, setDownloading] = useState(false);
++
++  const handleDownloadReport = async () => {
++    setDownloading(true);
++    try {
++      const response = await programmesAPI.downloadReport(id);
++      
++      // Create a blob from the response data
++      const blob = new Blob([response.data], { type: "application/pdf" });
++      const url = window.URL.createObjectURL(blob);
++      
++      // Trigger browser download
++      const a = document.createElement("a");
++      a.href = url;
++      a.download = `${programme.code}_accreditation_report.pdf`;
++      document.body.appendChild(a);
++      a.click();
++      
++      // Cleanup
++      window.URL.revokeObjectURL(url);
++      document.body.removeChild(a);
++      setToast("Report downloaded successfully.");
++    } catch (err) {
++      console.error("Failed to download PDF report", err);
++      setToast("Failed to download report. Please try again.");
++    } finally {
++      setDownloading(false);
++    }
++  };
++  // ...
+ 
+   const load = useCallback(async () => {
+     setLoading(true);
+@@ -366,11 +398,25 @@ export default function CourseDetail() {
+                 </span>
+               </div>
+             </div>
+-            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+-              <button onClick={()=>setShowUpload(true)} style={ds.btnPri}>
++            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
++              {/* ADD THE DOWNLOAD BUTTON: */}
++              <button 
++                onClick={handleDownloadReport} 
++                disabled={downloading}
++                style={{ 
++                  ...ds.btnSec, 
++                  borderColor: "#22D3EE", 
++                  color: "#22D3EE",
++                  background: "transparent"
++                }}
++              >
++                {downloading ? "📥 Downloading..." : "📥 Download PDF Report"}
++              </button>
++              
++              <button onClick={() => setShowUpload(true)} style={ds.btnPri}>
+                 📤 Upload Documents
+               </button>
+-              <button onClick={()=>navigate(`/courses`)} style={ds.btnGhost}>
++              <button onClick={() => navigate(`/courses`)} style={ds.btnGhost}>
+                 ← All Courses
+               </button>
+             </div>
+diff --git a/frontend/src/pages/Notification.jsx b/frontend/src/pages/Notification.jsx
+index f609951..90d0086 100644
+--- a/frontend/src/pages/Notification.jsx
++++ b/frontend/src/pages/Notification.jsx
+@@ -49,6 +49,10 @@ function timeAgo(d) {
+   return new Date(d).toLocaleDateString("en-NG",{day:"2-digit",month:"short",year:"numeric"});
+ }
+ 
++// Backend uses `is_read`; demo data and some legacy fields use `read`.
++// Normalize so the rest of the UI only checks one source of truth.
++const isUnread = (n) => !(n.is_read ?? n.read);
++
+ // ── Toast ─────────────────────────────────────────────────────────────────────
+ function useToast() {
+   const [toasts, setToasts] = useState([]);
+@@ -83,7 +87,7 @@ function ToastStack({ toasts }) {
+ // ── Single notification row ───────────────────────────────────────────────────
+ function NotifRow({ n, selected, onSelect, onRead, onDismiss, isDemo }) {
+   const cfg = TYPE[n.notification_type] || TYPE.system;
+-  const unread = !n.read;
++  const unread = isUnread(n);
+ 
+   return (
+     <div style={{
+@@ -224,8 +228,8 @@ export default function Notifications() {
+     } catch {
+       // Show 2 demo items while backend is connecting
+       let filtered = DEMO;
+-      if (readFilter === "false") filtered = filtered.filter(n=>!n.read);
+-      if (readFilter === "true")  filtered = filtered.filter(n=>n.read);
++      if (readFilter === "false") filtered = filtered.filter(n=>isUnread(n));
++      if (readFilter === "true")  filtered = filtered.filter(n=>!isUnread(n));
+       if (typeFilter) filtered = filtered.filter(n=>n.notification_type===typeFilter);
+       setItems(filtered);
+       setTotalCount(filtered.length);
+@@ -241,7 +245,7 @@ export default function Notifications() {
+   // ── Actions ───────────────────────────────────────────────────────────────
+   const handleRead = async (id) => {
+     try { await notificationsAPI.markRead(id); } catch {}
+-    setItems(p => p.map(n => n.id===id ? {...n,read:true} : n));
++    setItems(p => p.map(n => n.id===id ? {...n, is_read:true, read:true} : n));
+     toast("Marked as read.");
+   };
+ 
+@@ -256,7 +260,7 @@ export default function Notifications() {
+   const handleMarkAllRead = async () => {
+     setBulkLoading(true);
+     try { await notificationsAPI.markAllRead(); } catch {}
+-    setItems(p => p.map(n => ({...n, read:true})));
++    setItems(p => p.map(n => ({...n, is_read:true, read:true})));
+     toast("All notifications marked as read.");
+     setBulkLoading(false);
+   };
+@@ -265,7 +269,7 @@ export default function Notifications() {
+     setBulkLoading(true);
+     const ids = [...selected];
+     await Promise.allSettled(ids.map(id => notificationsAPI.markRead(id)));
+-    setItems(p => p.map(n => ids.includes(n.id) ? {...n,read:true} : n));
++    setItems(p => p.map(n => ids.includes(n.id) ? {...n, is_read:true, read:true} : n));
+     setSelected(new Set());
+     toast(`${ids.length} notification${ids.length>1?"s":""} marked as read.`);
+     setBulkLoading(false);
+@@ -285,7 +289,7 @@ export default function Notifications() {
+   const toggleSelect  = (id) => setSelected(p => { const s=new Set(p); s.has(id)?s.delete(id):s.add(id); return s; });
+   const toggleAll     = () => setSelected(selected.size===items.length ? new Set() : new Set(items.map(n=>n.id)));
+ 
+-  const unreadCount = items.filter(n=>!n.read).length;
++  const unreadCount = items.filter(n => isUnread(n)).length;
+   const totalPages  = Math.ceil(totalCount / PAGE_SIZE);
+ 
+   return (
+diff --git a/frontend/src/services/api.js b/frontend/src/services/api.js
+index c0fb9a3..5baa72b 100644
+--- a/frontend/src/services/api.js
++++ b/frontend/src/services/api.js
+@@ -3,13 +3,31 @@ import axios from "axios";
+ 
+ const api = axios.create({
+   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
+-  headers: { "Content-Type": "application/json" },
++  // Do not force a global Content-Type here. We'll set it per-request in the
++  // interceptor so FormData uploads can let the browser set the multipart
++  // boundary automatically.
+   timeout: 15000,
+ });
+ 
+ api.interceptors.request.use((config) => {
+   const token = localStorage.getItem("nuc_token");
++  if (!config.headers) config.headers = {};
+   if (token) config.headers.Authorization = `Bearer ${token}`;
++
++  // If the request body is FormData, remove any Content-Type so the browser
++  // will set multipart/form-data with the correct boundary. For non-FormData
++  // payloads, default to application/json when a body exists and no
++  // Content-Type is provided.
++  const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
++  if (isFormData) {
++    delete config.headers['Content-Type'];
++    delete config.headers['content-type'];
++  } else {
++    if (config.data != null && !config.headers['Content-Type'] && !config.headers['content-type']) {
++      config.headers['Content-Type'] = 'application/json';
++    }
++  }
++
+   return config;
+ });
+ 
+@@ -44,8 +62,14 @@ export const programmesAPI = {
+   update: (id, d)  => api.patch(`/programmes/${id}/`, d),
+   delete: (id)     => api.delete(`/programmes/${id}/`),
+   stats:  ()       => api.get("/programmes/stats/"),
++
++  downloadReport: (id)     => api.get(`/programmes/${id}/report/`, {
++    params: { format: "pdf" },
++    responseType: "blob"
++  }),
+ };
+ 
++
+ // ── Milestones ────────────────────────────────────────────────────────────────
+ export const milestonesAPI = {
+   list:     (pid)       => api.get(`/programmes/${pid}/milestones/`),
+@@ -56,10 +80,13 @@ export const milestonesAPI = {
+ export const documentsAPI = {
+   listAll: (params)              => api.get("/documents/", { params }),
+   list:    (pid)                 => api.get(`/programmes/${pid}/documents/`),
+-  upload:  (pid, fd, onProgress) => api.post(`/programmes/${pid}/documents/`, fd, {
+-    headers: { "Content-Type": "multipart/form-data" },
+-    onUploadProgress: (e) => { if (onProgress && e.total) onProgress(Math.round(e.loaded * 100 / e.total)); },
+-  }),
++  upload:  (pid, fd, onProgress) => {
++    // Let the request interceptor handle Content-Type for FormData. Pass the
++    // FormData directly so axios/browser can set the multipart boundary.
++    return api.post(`/programmes/${pid}/documents/`, fd, {
++      onUploadProgress: (e) => { if (onProgress && e.total) onProgress(Math.round(e.loaded * 100 / e.total)); },
++    });
++  },
+   update: (id, data) => api.patch(`/documents/${id}/`, data),
+   verify: (id)       => api.patch(`/documents/${id}/verify/`),
+   delete: (id)       => api.delete(`/documents/${id}/`),

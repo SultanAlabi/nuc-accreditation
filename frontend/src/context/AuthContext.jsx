@@ -10,7 +10,7 @@ async function apiFetch(endpoint, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Token ${token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -18,6 +18,7 @@ async function apiFetch(endpoint, options = {}) {
   try { data = await res.json(); } catch { data = {}; }
   if (!res.ok) {
     const message =
+      data.error ||
       data.non_field_errors?.[0] ||
       data.detail ||
       data.email?.[0] ||

@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import User
+from django.db.models import JSONField
 
 class Programme(models.Model):
     class Status(models.TextChoices):
@@ -37,3 +38,23 @@ class Milestone(models.Model):
 
     def __str__(self):
         return f"{self.programme.name} - {self.title}"
+
+
+class ProgrammeReportAudit(models.Model):
+    class Action(models.TextChoices):
+        DOWNLOAD = 'DOWNLOAD', 'Download'
+        VIEW = 'VIEW', 'View'
+
+    programme = models.ForeignKey(Programme, on_delete=models.CASCADE, related_name='report_audits')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=20, choices=Action.choices)
+    ip_address = models.CharField(max_length=100, blank=True)
+    user_agent = models.TextField(blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    extra_data = JSONField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.programme.name} - {self.action} @ {self.timestamp}"

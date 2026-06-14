@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, filters
 from accounts.permissions import IsHOD, IsAPU, IsAnyRole
 from .models import Document
 from .serializers import DocumentSerializer
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 class GlobalDocumentListView(generics.ListAPIView):
@@ -48,6 +49,8 @@ class GlobalDocumentListView(generics.ListAPIView):
 
 class DocumentListCreateView(generics.ListCreateAPIView):
     serializer_class = DocumentSerializer
+    # Accept multipart form data (file uploads)
+    parser_classes = [MultiPartParser, FormParser]
 
     def get_permissions(self):
         if self.request.method == 'POST':

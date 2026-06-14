@@ -21,6 +21,8 @@ pip-delete-this-directory.txt
 
 # Environment
 .env
+*.env
+!.env.example
 backend/.env
 
 # Node
@@ -34,6 +36,20 @@ frontend/dist/
 npm-debug.log*
 yarn-debug.log*
 
+# Generated PDFs, temp reports/logs, media outputs, and test artifacts
+backend/tmp_*.txt
+backend/tmp_*.pdf
+backend/tmp_upload_test.py
+backend/media/
+frontend/tmp_report.pdf
+frontend/test-doc.docx
+report_json_api_auth_1.txt
+test_report.pdf
+live_report_1.pdf
+
+# Postman credential-containing request
+postman/collections/New Collection/New Request-2.request.yaml
+
 # Editors
 .vscode/
 .idea/
@@ -43,3 +59,4 @@ yarn-debug.log*
 *.sln
 *.sw?
 .DS_Store
+

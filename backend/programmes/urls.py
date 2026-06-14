@@ -9,12 +9,14 @@ from .views import (
     ProgrammeRatioView,
     SubmitProgrammeView,
     ForwardToNUCView,
-    NUCDecisionView
+    NUCDecisionView,
+    ProgrammeReportView,
 )
 
 urlpatterns = [
     path('', ProgrammeListCreateView.as_view(), name='programme-list'),
     path('<int:pk>/', ProgrammeDetailView.as_view(), name='programme-detail'),
+    path('<int:pk>/report/', ProgrammeReportView.as_view(), name='programme-report'),
     path('<int:pk>/milestones/', MilestoneListCreateView.as_view(), name='milestone-list'),
     path('milestones/<int:pk>/', MilestoneDetailView.as_view(), name='milestone-detail'),
     path('calculator/', RatioCalculatorView.as_view(), name='ratio-calculator'),

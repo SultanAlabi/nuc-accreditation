@@ -214,6 +214,8 @@ function UploadModal({ programmeId, onClose, onSuccess }) {
         </div>
       </div>
     </div>
+
+    
   );
 }
 
@@ -231,6 +233,36 @@ export default function CourseDetail() {
   const [showUpload, setShowUpload] = useState(false);
   const [toast,     setToast]     = useState(location.state?.toast || "");
   const [docFilter, setDocFilter] = useState("all");
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadReport = async () => {
+    setDownloading(true);
+    try {
+      const response = await programmesAPI.downloadReport(id);
+      
+      // Create a blob from the response data
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Trigger browser download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${programme.code}_accreditation_report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setToast("Report downloaded successfully.");
+    } catch (err) {
+      console.error("Failed to download PDF report", err);
+      setToast("Failed to download report. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+  // ...
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -366,11 +398,25 @@ export default function CourseDetail() {
                 </span>
               </div>
             </div>
-            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-              <button onClick={()=>setShowUpload(true)} style={ds.btnPri}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {/* ADD THE DOWNLOAD BUTTON: */}
+              <button 
+                onClick={handleDownloadReport} 
+                disabled={downloading}
+                style={{ 
+                  ...ds.btnSec, 
+                  borderColor: "#22D3EE", 
+                  color: "#22D3EE",
+                  background: "transparent"
+                }}
+              >
+                {downloading ? "📥 Downloading..." : "📥 Download PDF Report"}
+              </button>
+              
+              <button onClick={() => setShowUpload(true)} style={ds.btnPri}>
                 📤 Upload Documents
               </button>
-              <button onClick={()=>navigate(`/courses`)} style={ds.btnGhost}>
+              <button onClick={() => navigate(`/courses`)} style={ds.btnGhost}>
                 ← All Courses
               </button>
             </div>

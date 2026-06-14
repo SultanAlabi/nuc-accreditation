@@ -49,6 +49,10 @@ function timeAgo(d) {
   return new Date(d).toLocaleDateString("en-NG",{day:"2-digit",month:"short",year:"numeric"});
 }
 
+// Backend uses `is_read`; demo data and some legacy fields use `read`.
+// Normalize so the rest of the UI only checks one source of truth.
+const isUnread = (n) => !(n.is_read ?? n.read);
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -83,7 +87,7 @@ function ToastStack({ toasts }) {
 // ── Single notification row ───────────────────────────────────────────────────
 function NotifRow({ n, selected, onSelect, onRead, onDismiss, isDemo }) {
   const cfg = TYPE[n.notification_type] || TYPE.system;
-  const unread = !n.read;
+  const unread = isUnread(n);
 
   return (
     <div style={{
@@ -224,8 +228,8 @@ export default function Notifications() {
     } catch {
       // Show 2 demo items while backend is connecting
       let filtered = DEMO;
-      if (readFilter === "false") filtered = filtered.filter(n=>!n.read);
-      if (readFilter === "true")  filtered = filtered.filter(n=>n.read);
+      if (readFilter === "false") filtered = filtered.filter(n=>isUnread(n));
+      if (readFilter === "true")  filtered = filtered.filter(n=>!isUnread(n));
       if (typeFilter) filtered = filtered.filter(n=>n.notification_type===typeFilter);
       setItems(filtered);
       setTotalCount(filtered.length);
@@ -241,7 +245,7 @@ export default function Notifications() {
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleRead = async (id) => {
     try { await notificationsAPI.markRead(id); } catch {}
-    setItems(p => p.map(n => n.id===id ? {...n,read:true} : n));
+    setItems(p => p.map(n => n.id===id ? {...n, is_read:true, read:true} : n));
     toast("Marked as read.");
   };
 
@@ -256,7 +260,7 @@ export default function Notifications() {
   const handleMarkAllRead = async () => {
     setBulkLoading(true);
     try { await notificationsAPI.markAllRead(); } catch {}
-    setItems(p => p.map(n => ({...n, read:true})));
+    setItems(p => p.map(n => ({...n, is_read:true, read:true})));
     toast("All notifications marked as read.");
     setBulkLoading(false);
   };
@@ -265,7 +269,7 @@ export default function Notifications() {
     setBulkLoading(true);
     const ids = [...selected];
     await Promise.allSettled(ids.map(id => notificationsAPI.markRead(id)));
-    setItems(p => p.map(n => ids.includes(n.id) ? {...n,read:true} : n));
+    setItems(p => p.map(n => ids.includes(n.id) ? {...n, is_read:true, read:true} : n));
     setSelected(new Set());
     toast(`${ids.length} notification${ids.length>1?"s":""} marked as read.`);
     setBulkLoading(false);
@@ -285,7 +289,7 @@ export default function Notifications() {
   const toggleSelect  = (id) => setSelected(p => { const s=new Set(p); s.has(id)?s.delete(id):s.add(id); return s; });
   const toggleAll     = () => setSelected(selected.size===items.length ? new Set() : new Set(items.map(n=>n.id)));
 
-  const unreadCount = items.filter(n=>!n.read).length;
+  const unreadCount = items.filter(n => isUnread(n)).length;
   const totalPages  = Math.ceil(totalCount / PAGE_SIZE);
 
   return (

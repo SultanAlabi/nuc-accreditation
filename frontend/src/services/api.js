@@ -3,13 +3,31 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
-  headers: { "Content-Type": "application/json" },
+  // Do not force a global Content-Type here. We'll set it per-request in the
+  // interceptor so FormData uploads can let the browser set the multipart
+  // boundary automatically.
   timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("nuc_token");
+  if (!config.headers) config.headers = {};
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // If the request body is FormData, remove any Content-Type so the browser
+  // will set multipart/form-data with the correct boundary. For non-FormData
+  // payloads, default to application/json when a body exists and no
+  // Content-Type is provided.
+  const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+  if (isFormData) {
+    delete config.headers['Content-Type'];
+    delete config.headers['content-type'];
+  } else {
+    if (config.data != null && !config.headers['Content-Type'] && !config.headers['content-type']) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+  }
+
   return config;
 });
 
@@ -44,7 +62,13 @@ export const programmesAPI = {
   update: (id, d)  => api.patch(`/programmes/${id}/`, d),
   delete: (id)     => api.delete(`/programmes/${id}/`),
   stats:  ()       => api.get("/programmes/stats/"),
+
+  downloadReport: (id)     => api.get(`/programmes/${id}/report/`, {
+    params: { format: "pdf" },
+    responseType: "blob"
+  }),
 };
+
 
 // ── Milestones ────────────────────────────────────────────────────────────────
 export const milestonesAPI = {
@@ -56,10 +80,13 @@ export const milestonesAPI = {
 export const documentsAPI = {
   listAll: (params)              => api.get("/documents/", { params }),
   list:    (pid)                 => api.get(`/programmes/${pid}/documents/`),
-  upload:  (pid, fd, onProgress) => api.post(`/programmes/${pid}/documents/`, fd, {
-    headers: { "Content-Type": "multipart/form-data" },
-    onUploadProgress: (e) => { if (onProgress && e.total) onProgress(Math.round(e.loaded * 100 / e.total)); },
-  }),
+  upload:  (pid, fd, onProgress) => {
+    // Let the request interceptor handle Content-Type for FormData. Pass the
+    // FormData directly so axios/browser can set the multipart boundary.
+    return api.post(`/programmes/${pid}/documents/`, fd, {
+      onUploadProgress: (e) => { if (onProgress && e.total) onProgress(Math.round(e.loaded * 100 / e.total)); },
+    });
+  },
   update: (id, data) => api.patch(`/documents/${id}/`, data),
   verify: (id)       => api.patch(`/documents/${id}/verify/`),
   delete: (id)       => api.delete(`/documents/${id}/`),

@@ -28,9 +28,11 @@ class NotificationListView(generics.ListAPIView):
 
 
 class MarkReadView(generics.UpdateAPIView):
-    queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAnyRole]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user)
 
     def perform_update(self, serializer):
         serializer.save(is_read=True)

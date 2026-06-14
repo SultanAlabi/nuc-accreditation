@@ -1,16 +1,29 @@
-from rest_framework import generics, permissions, status
-from rest_framework.views import APIView
+import logging
+import re
+from urllib.parse import quote
+
+from django.http import HttpResponse
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import generics, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from accounts.models import User
 from accounts.permissions import IsHOD, IsAPU, IsNUCVisitor, IsHODOrAPU, IsAnyRole
 from notifications.models import Notification
-from .models import Programme, Milestone
+
+from .models import Programme, Milestone, ProgrammeReportAudit
+from .pdf_generator import generate_pdf_report
+from .report_service import generate_readiness_report
 from .serializers import ProgrammeSerializer, MilestoneSerializer
 from .services import check_ratio, NUC_STANDARDS
 
+logger = logging.getLogger(__name__)
 
 class ProgrammeListCreateView(generics.ListCreateAPIView):
     serializer_class = ProgrammeSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['status', 'faculty', 'department']
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -119,6 +132,7 @@ class ProgrammeRatioView(APIView):
     permission_classes = [IsAnyRole]
 
     def get(self, request, pk):
+        # (debug logging moved to ProgrammeReportView.get)
         try:
             programme = Programme.objects.get(pk=pk)
         except Programme.DoesNotExist:
@@ -219,7 +233,6 @@ class ForwardToNUCView(APIView):
             "status": "FORWARDED_TO_NUC"
         })
 
-
 class NUCDecisionView(APIView):
     """NUC Visitor makes final accreditation decision"""
     permission_classes = [IsNUCVisitor]
@@ -273,3 +286,80 @@ class NUCDecisionView(APIView):
             "status": decision,
             "comments": comments
         })
+ 
+class ProgrammeReportView(APIView):
+    """Generate accreditation readiness report for a programme"""
+    permission_classes = [IsAnyRole]
+    # Prevent DRF from interpreting the `format` query param (e.g. ?format=pdf)
+    # as a renderer selection which raises Http404 when no renderer exists.
+    format_kwarg = None
+
+    def perform_content_negotiation(self, request, force=False):
+        # Bypass DRF renderer/content negotiation only for PDF responses.
+        # JSON responses still need DRF to set accepted_renderer.
+        if request.query_params.get('format', '').lower() == 'pdf':
+            return (None, None)
+        return super().perform_content_negotiation(request, force)
+
+    def get(self, request, pk):
+        programme = self._get_programme_or_404(pk)
+        if programme is None:
+            return programme
+
+        report_data = generate_readiness_report(programme)
+        fmt = request.query_params.get('format', 'json').lower()
+
+        if fmt == 'pdf':
+            return self._pdf_response(programme, report_data)
+
+        self._create_report_audit(programme, ProgrammeReportAudit.Action.VIEW, request)
+        return Response(report_data, status=status.HTTP_200_OK)
+
+    def _get_programme_or_404(self, pk):
+        try:
+            return Programme.objects.get(pk=pk)
+        except Programme.DoesNotExist:
+            return Response(
+                {"error": "Programme not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def _pdf_response(self, programme, report_data):
+        buffer = generate_pdf_report(report_data)
+        self._create_report_audit(programme, ProgrammeReportAudit.Action.DOWNLOAD, self.request)
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        filename = self._report_filename(programme)
+        response['Content-Disposition'] = self._content_disposition(filename)
+        return response
+
+    def _create_report_audit(self, programme, action, request=None):
+        try:
+            ProgrammeReportAudit.objects.create(
+                programme=programme,
+                user=self._authenticated_user(request),
+                action=action,
+                ip_address=getattr(request, 'META', {}).get('REMOTE_ADDR', '') if request is not None else '',
+                user_agent=getattr(request, 'META', {}).get('HTTP_USER_AGENT', '') if request is not None else '',
+            )
+        except Exception:
+            logger.exception('Failed to create programme report audit')
+
+    def _authenticated_user(self, request):
+        if request is None:
+            return None
+        user = getattr(request, 'user', None)
+        if user and getattr(user, 'is_authenticated', False):
+            return user
+        return None
+
+    def _report_filename(self, programme):
+        safe_name = re.sub(r'[^A-Za-z0-9._-]+', '_', programme.name.strip())
+        if safe_name.lower().endswith('.pdf'):
+            safe_name = safe_name[:-4]
+        safe_name = re.sub(r'_+', '_', safe_name).strip('._-') or 'accreditation_report'
+        return f"accreditation_report_{safe_name}.pdf"
+
+    def _content_disposition(self, filename):
+        quoted_filename = quote(filename)
+        return f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quoted_filename}'
+
