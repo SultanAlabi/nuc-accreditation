@@ -9,7 +9,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("nuc_token");
-  if (token) config.headers.Authorization = `Token ${token}`;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -27,11 +27,14 @@ api.interceptors.response.use(
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 export const authAPI = {
-  login:    (data) => api.post("/auth/login/", data),
-  register: (data) => api.post("/auth/register/", data),
-  logout:   ()     => api.post("/auth/logout/"),
-  me:       ()     => api.get("/auth/me/"),
+  login:          (data) => api.post("/auth/login/", data),
+  register:       (data) => api.post("/auth/register/", data),
+  logout:         ()     => api.post("/auth/logout/"),
+  me:             ()     => api.get("/auth/me/"),
+  forgotPassword: (data) => api.post("/auth/forgot-password/", data),
+  resetPassword:  (data) => api.post("/auth/reset-password/", data),
 };
+
 
 // ── Programmes ────────────────────────────────────────────────────────────────
 export const programmesAPI = {
@@ -46,7 +49,7 @@ export const programmesAPI = {
 // ── Milestones ────────────────────────────────────────────────────────────────
 export const milestonesAPI = {
   list:     (pid)       => api.get(`/programmes/${pid}/milestones/`),
-  complete: (pid, msId) => api.patch(`/programmes/${pid}/milestones/${msId}/`, { completed: true }),
+  complete: (pid, msId) => api.patch(`/programmes/milestones/${msId}/`, { status: 'COMPLETED' }),
 };
 
 // ── Documents ─────────────────────────────────────────────────────────────────
@@ -58,28 +61,19 @@ export const documentsAPI = {
     onUploadProgress: (e) => { if (onProgress && e.total) onProgress(Math.round(e.loaded * 100 / e.total)); },
   }),
   update: (id, data) => api.patch(`/documents/${id}/`, data),
-  verify: (id)       => api.patch(`/documents/${id}/`, { verified: true }),
+  verify: (id)       => api.patch(`/documents/${id}/verify/`),
   delete: (id)       => api.delete(`/documents/${id}/`),
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-// GET    /api/notifications/?read=false&notification_type=resource_visit&page=1
-// PATCH  /api/notifications/:id/     { read: true }
-// POST   /api/notifications/mark-all-read/
-// DELETE /api/notifications/:id/
 export const notificationsAPI = {
   list:        (params) => api.get("/notifications/", { params }),
-  markRead:    (id)     => api.patch(`/notifications/${id}/`, { read: true }),
+  markRead:    (id)     => api.patch(`/notifications/${id}/read/`),
   markAllRead: ()       => api.post("/notifications/mark-all-read/"),
   dismiss:     (id)     => api.delete(`/notifications/${id}/`),
 };
 
 // ── Settings / Profile ────────────────────────────────────────────────────────
-// GET   /api/auth/me/
-// PATCH /api/auth/profile/         { first_name, last_name, phone, university, department }
-// POST  /api/auth/change-password/ { old_password, new_password }
-// PATCH /api/auth/preferences/     { email_notifications, sms_notifications, ... }
-// DELETE /api/auth/account/        (deactivate account)
 export const settingsAPI = {
   getProfile:     ()     => api.get("/auth/me/"),
   updateProfile:  (data) => api.patch("/auth/profile/", data),
@@ -91,6 +85,16 @@ export const settingsAPI = {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboardAPI = {
   summary: () => api.get("/dashboard/summary/"),
+};
+
+// ── Team ──────────────────────────────────────────────────────────────────────
+export const teamAPI = {
+  list:     (params) => api.get("/team/members/", { params }),
+  get:      (id)     => api.get(`/team/members/${id}/`),
+  create:   (data)   => api.post("/team/members/", data),
+  update:   (id, d)  => api.patch(`/team/members/${id}/`, d),
+  remove:   (id)     => api.delete(`/team/members/${id}/`),
+  invite:   (data)   => api.post("/team/invites/", data),
 };
 
 export default api;

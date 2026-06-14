@@ -5,6 +5,7 @@ class Programme(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', 'Pending'
         IN_REVIEW = 'IN_REVIEW', 'In Review'
+        FORWARDED_TO_NUC = 'FORWARDED_TO_NUC', 'Forwarded to NUC'
         ACCREDITED = 'ACCREDITED', 'Accredited'
         DENIED = 'DENIED', 'Denied'
 

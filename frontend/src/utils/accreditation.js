@@ -15,7 +15,9 @@ export function daysBetween(d1, d2) {
 }
 
 export function addYears(dateStr, years) {
+  if (!dateStr) return new Date().toISOString().split("T")[0];
   const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
   d.setFullYear(d.getFullYear() + years);
   return d.toISOString().split("T")[0];
 }

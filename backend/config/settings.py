@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'programmes',
     'documents',
     'notifications',
+    'dashboard',
+    'team',
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -158,4 +160,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+# Email Settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'no-reply@nuc-accreditation.edu.ng'
+
 

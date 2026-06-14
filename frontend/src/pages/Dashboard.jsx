@@ -1,8 +1,3 @@
-
-// src/pages/Dashboard.jsx
-// NO role restriction on this route — all three roles land here.
-// Internally renders HODDashboard, APUDashboard, or NUCDashboard based on role.
-
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -586,9 +581,6 @@ function NUCDashboard() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ROOT EXPORT — routes to correct dashboard, never shows AccessDenied
-// ═══════════════════════════════════════════════════════════════════════════════
 export default function Dashboard() {
   const { isHOD, isAPU, isNUC } = useRole();
   if (isHOD) return <HODDashboard />;

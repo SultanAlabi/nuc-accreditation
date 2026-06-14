@@ -1,15 +1,3 @@
-// src/pages/Team.jsx
-//
-// NUC Accreditation Team Portal
-// Three roles: The Professor (lead), NUC Staff, and Third Member (observer)
-//
-// Django endpoints:
-//   GET    /api/team/members/
-//   POST   /api/team/members/          { name, email, role, programme_ids }
-//   PATCH  /api/team/members/:id/      { status, access_level }
-//   DELETE /api/team/members/:id/
-//   POST   /api/team/invites/          { email, role, programme_ids }
-//   GET    /api/team/access-log/       { member_id, page }
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -164,7 +152,7 @@ function InviteModal({ programmes, onClose, onSuccess, toast }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Token ${token}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(form),
       });
@@ -631,7 +619,7 @@ export default function Team() {
     setLoading(true);
     try {
       const token = localStorage.getItem("nuc_token");
-      const headers = token ? { Authorization:`Token ${token}` } : {};
+      const headers = token ? { Authorization:`Bearer ${token}` } : {};
       const [membersRes, progsRes] = await Promise.all([
         fetch(`${API}/team/members/`, { headers }).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
         fetch(`${API}/programmes/`,   { headers }).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
@@ -658,7 +646,7 @@ export default function Team() {
         method: "PATCH",
         headers: {
           "Content-Type":"application/json",
-          ...(token ? { Authorization:`Token ${token}` } : {}),
+          ...(token ? { Authorization:`Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ status: "REVOKED" }),
       });
@@ -679,7 +667,7 @@ export default function Team() {
         method: "PATCH",
         headers: {
           "Content-Type":"application/json",
-          ...(token ? { Authorization:`Token ${token}` } : {}),
+          ...(token ? { Authorization:`Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ status: "ACTIVE" }),
       });
@@ -695,7 +683,7 @@ export default function Team() {
       const token = localStorage.getItem("nuc_token");
       await fetch(`${API}/team/members/${removeTarget.id}/`, {
         method: "DELETE",
-        headers: token ? { Authorization:`Token ${token}` } : {},
+        headers: token ? { Authorization:`Bearer ${token}` } : {},
       });
     } catch {}
     setMembers(p => p.filter(m => m.id !== removeTarget.id));
