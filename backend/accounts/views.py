@@ -15,7 +15,10 @@ from django.utils import timezone
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
-    return str(refresh.access_token)
+    return {
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -24,9 +27,10 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            token = get_tokens_for_user(user)
+            tokens = get_tokens_for_user(user)
             return Response({
-                "token": token,
+                "access": tokens['access'],
+                "refresh": tokens['refresh'],
                 "user": UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -52,9 +56,10 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        token = get_tokens_for_user(user)
+        tokens = get_tokens_for_user(user)
         return Response({
-            "token": token,
+            "access": tokens['access'],
+            "refresh": tokens['refresh'],
             "user": UserSerializer(user).data
         })
 

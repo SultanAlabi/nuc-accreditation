@@ -17,13 +17,18 @@ async function apiFetch(endpoint, options = {}) {
   let data;
   try { data = await res.json(); } catch { data = {}; }
   if (!res.ok) {
-    const message =
+    let message =
       data.error ||
       data.non_field_errors?.[0] ||
       data.detail ||
       data.email?.[0] ||
       data.password?.[0] ||
       "Something went wrong. Please try again.";
+
+    if (res.status === 403) {
+      message = data.detail || "You do not have permission to perform this action. Please contact your administrator if you believe this is an error.";
+    }
+
     throw Object.assign(new Error(message), { status: res.status, data });
   }
   return data;
@@ -61,9 +66,10 @@ export function AuthProvider({ children }) {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
-    localStorage.setItem("nuc_token", data.token);
+    localStorage.setItem("nuc_token", data.access);
+    localStorage.setItem("nuc_refresh_token", data.refresh);
     localStorage.setItem("nuc_user",  JSON.stringify(data.user));
-    setToken(data.token);
+    setToken(data.access);
     setUser(data.user);
     return data.user;
   }, []);
@@ -73,9 +79,10 @@ export function AuthProvider({ children }) {
       method: "POST",
       body: JSON.stringify(formData),
     });
-    localStorage.setItem("nuc_token", data.token);
+    localStorage.setItem("nuc_token", data.access);
+    localStorage.setItem("nuc_refresh_token", data.refresh);
     localStorage.setItem("nuc_user",  JSON.stringify(data.user));
-    setToken(data.token);
+    setToken(data.access);
     setUser(data.user);
     return data.user;
   }, []);
@@ -83,6 +90,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     apiFetch("/auth/logout/", { method: "POST" }).catch(() => {});
     localStorage.removeItem("nuc_token");
+    localStorage.removeItem("nuc_refresh_token");
     localStorage.removeItem("nuc_user");
     setToken(null);
     setUser(null);
