@@ -12,7 +12,7 @@ import CourseDetail  from "./pages/CourseDetail";
 import NewCourse     from "./pages/NewCourse";
 import Documents     from "./pages/Documents";
 import Calculator    from "./pages/Calculator";
-import Notifications from "./pages/Notification";
+import Notifications from "./pages/Notifications";
 import Settings      from "./pages/Settings";
 import Team          from "./pages/Team";
 import AccessDenied  from "./pages/AccessDenied";
