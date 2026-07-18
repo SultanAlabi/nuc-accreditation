@@ -29,17 +29,12 @@ For demonstration and testing purposes, four demo accounts have been pre-configu
   - Password: `password123`
 
 - **HOD (Head of Department)**
-  - Email: `hod@demo.com`
-  - Password: `password123`
+  - Email: `mlawal@gmail.com`
+  - Password: `mlawal123`
   - Role: HOD
-- **APU Officer**
-  - Email: `apu@demo.com`
-  - Password: `password123`
-  - Role: APU
-- **NUC Official**
-  - Email: `nuc@demo.com`
-  - Password: `password123`
-  - Role: NUC_VISITOR
+- **APU Officer** & **NUC Official** to be created by the user
+
+**Web Hosting Link** : [nuc-accreditation.vercel.app](https://nuc-accreditation.vercel.app/)
 
 ### Dashboard
 Once logged in, you will be presented with a dynamic KPI Dashboard that provides:
